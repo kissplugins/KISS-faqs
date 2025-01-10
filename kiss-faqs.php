@@ -1,11 +1,11 @@
 <?php
 /**
- * Plugin Name: Hypercart FAQs with Schema
- * Plugin URI:  https://example.com/hypercart-faqs
+ * Plugin Name: KISS FAQs with Schema
+ * Plugin URI:  https://KISSplugins.com
  * Description: Manage and display FAQs (Question = Post Title, Answer = Post Content Editor) with Google's Structured Data. Includes ID display, Safari reveal/hide fix, and checks for legacy DB data.
  * Version: 1.03
- * Author: Your Name
- * Author URI: https://example.com
+ * Author: KISS plugins
+ * Author URI: https://KISSplugins.com
  * License: GPL2
  *
  * Text Domain: hypercart-faqs
