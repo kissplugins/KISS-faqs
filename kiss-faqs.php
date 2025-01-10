@@ -1,11 +1,11 @@
 <?php
 /**
  * Plugin Name: KISS FAQs with Schema
- * Plugin URI:  https://example.com/kiss-faqs
+ * Plugin URI:  https://KISSplugins.com
  * Description: Manage and display FAQs (Question = Post Title, Answer = Post Content Editor) with Google's Structured Data. Shortcode: [KISSFAQ post="ID"]. Safari-friendly toggle, displays FAQ ID in editor, and now has a column showing the shortcode/post ID.
  * Version: 1.04
- * Author: Your Name
- * Author URI: https://example.com
+ * Author: KISS Plugins
+ * Author URI: https://KISSplugins.com
  * License: GPL2
  *
  * Text Domain: kiss-faqs
