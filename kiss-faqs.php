@@ -1,14 +1,14 @@
 <?php
 /**
  * Plugin Name: KISS FAQs with Schema
- * Plugin URI:  https://KISSplugins.com
- * Description: Manage and display FAQs (Question = Post Title, Answer = Post Content Editor) with Google's Structured Data. Includes ID display, Safari reveal/hide fix, and checks for legacy DB data.
- * Version: 1.03
- * Author: KISS plugins
- * Author URI: https://KISSplugins.com
+ * Plugin URI:  https://example.com/kiss-faqs
+ * Description: Manage and display FAQs (Question = Post Title, Answer = Post Content Editor) with Google's Structured Data. Shortcode: [KISSFAQ post="ID"]. Safari-friendly toggle, displays FAQ ID in editor, and now has a column showing the shortcode/post ID.
+ * Version: 1.04
+ * Author: Your Name
+ * Author URI: https://example.com
  * License: GPL2
  *
- * Text Domain: hypercart-faqs
+ * Text Domain: kiss-faqs
  * Domain Path: /languages
  */
 
@@ -31,18 +31,18 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit; // Disallow direct file access
 }
 
-class HypercartFAQsWithSchema {
+class KISSFAQsWithSchema {
 
     private static $instance = null;
-    public $plugin_version = '1.03';
-    public $db_table_name  = 'HypercartFAQs'; // Table from older versions (legacy)
+    public $plugin_version = '1.04';
+    public $db_table_name  = 'KISSFAQs'; // Table name (legacy)
 
     /**
      * Singleton Instance
      */
     public static function init() {
         if ( is_null( self::$instance ) ) {
-            self::$instance = new HypercartFAQsWithSchema();
+            self::$instance = new KISSFAQsWithSchema();
         }
         return self::$instance;
     }
@@ -59,7 +59,7 @@ class HypercartFAQsWithSchema {
         add_action( 'init', array( $this, 'register_faqs_cpt' ) );
 
         // Shortcode
-        add_shortcode( 'HTPFAQ', array( $this, 'render_faq_shortcode' ) );
+        add_shortcode( 'KISSFAQ', array( $this, 'render_faq_shortcode' ) );
 
         // Check for legacy data on admin notice
         add_action( 'admin_notices', array( $this, 'admin_notice_legacy_data' ) );
@@ -67,18 +67,22 @@ class HypercartFAQsWithSchema {
         // Show FAQ ID in editor
         add_action( 'edit_form_after_title', array( $this, 'display_faq_id_in_editor' ) );
 
-        // Replace "Settings" link with link to All FAQs
+        // "Settings" link → All FAQs
         add_filter( 'plugin_action_links_' . plugin_basename(__FILE__), array( $this, 'add_plugin_settings_link' ) );
 
-        // (Optional) If you still want a custom settings page, you can keep or remove
+        // (Optional) If you want a custom settings page
         add_action( 'admin_menu', array( $this, 'register_settings_menu' ) );
+
+        // **NEW**: Add a column in the CPT listing to show the shortcode/post ID
+        add_filter( 'manage_kiss_faq_posts_columns', array( $this, 'add_shortcode_column' ) );
+        add_action( 'manage_kiss_faq_posts_custom_column', array( $this, 'render_shortcode_column' ), 10, 2 );
     }
 
     /**
      * Plugin activation
      */
     public function activate_plugin() {
-        // If you no longer need the legacy table, you can remove dbDelta creation.
+        // If you still want the old table, keep dbDelta
         global $wpdb;
         $table_name      = $wpdb->prefix . $this->db_table_name;
         $charset_collate = $wpdb->get_charset_collate();
@@ -94,7 +98,7 @@ class HypercartFAQsWithSchema {
         require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
         dbDelta( $sql );
 
-        // Check if any legacy data remains
+        // Check for leftover legacy data
         $this->check_legacy_data();
     }
 
@@ -102,11 +106,11 @@ class HypercartFAQsWithSchema {
      * Plugin deactivation
      */
     public function deactivate_plugin() {
-        // e.g., no action taken but could flush_rewrite_rules() or drop table, etc.
+        // e.g., do nothing or flush_rewrite_rules();
     }
 
     /**
-     * Check for legacy DB records from older plugin versions
+     * Check for legacy DB records from older versions
      */
     public function check_legacy_data() {
         global $wpdb;
@@ -121,12 +125,12 @@ class HypercartFAQsWithSchema {
             // Count how many records
             $count = $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name}" );
             if ( $count > 0 ) {
-                update_option( 'hypercart_faqs_legacy_data_exists', $count );
+                update_option( 'kiss_faqs_legacy_data_exists', $count );
             } else {
-                delete_option( 'hypercart_faqs_legacy_data_exists' );
+                delete_option( 'kiss_faqs_legacy_data_exists' );
             }
         } else {
-            delete_option( 'hypercart_faqs_legacy_data_exists' );
+            delete_option( 'kiss_faqs_legacy_data_exists' );
         }
     }
 
@@ -134,47 +138,45 @@ class HypercartFAQsWithSchema {
      * Admin notice if legacy data is found
      */
     public function admin_notice_legacy_data() {
-        $count = get_option( 'hypercart_faqs_legacy_data_exists', 0 );
+        $count = get_option( 'kiss_faqs_legacy_data_exists', 0 );
         if ( $count > 0 ) {
             echo '<div class="notice notice-warning is-dismissible">';
-            echo '<p><strong>Hypercart FAQs with Schema:</strong> We found <code>' . intval( $count ) . '</code> legacy record(s) in the old <code>' . esc_html( $this->db_table_name ) . '</code> table. This plugin no longer uses those records. You may remove or migrate them if you wish.</p>';
+            echo '<p><strong>KISS FAQs with Schema:</strong> We found <code>' . intval( $count ) . '</code> legacy record(s) in the old <code>' . esc_html( $this->db_table_name ) . '</code> table. This plugin no longer uses those records. You may remove or migrate them if you wish.</p>';
             echo '</div>';
-            // If you only want this to display once, uncomment:
-            // delete_option( 'hypercart_faqs_legacy_data_exists' );
         }
     }
 
     /**
-     * Register Custom Post Type: hypercart_faq
+     * Register Custom Post Type: kiss_faq
      * - Question = post title
      * - Answer   = post content
      */
     public function register_faqs_cpt() {
         $labels = array(
-            'name'                  => __( 'FAQs', 'hypercart-faqs' ),
-            'singular_name'         => __( 'FAQ', 'hypercart-faqs' ),
-            'menu_name'             => __( 'FAQs', 'hypercart-faqs' ),
-            'name_admin_bar'        => __( 'FAQ', 'hypercart-faqs' ),
-            'add_new'               => __( 'Add New', 'hypercart-faqs' ),
-            'add_new_item'          => __( 'Add New FAQ', 'hypercart-faqs' ),
-            'new_item'              => __( 'New FAQ', 'hypercart-faqs' ),
-            'edit_item'             => __( 'Edit FAQ', 'hypercart-faqs' ),
-            'view_item'             => __( 'View FAQ', 'hypercart-faqs' ),
-            'all_items'             => __( 'All FAQs', 'hypercart-faqs' ),
-            'search_items'          => __( 'Search FAQs', 'hypercart-faqs' ),
-            'parent_item_colon'     => __( 'Parent FAQs:', 'hypercart-faqs' ),
-            'not_found'             => __( 'No FAQs found.', 'hypercart-faqs' ),
-            'not_found_in_trash'    => __( 'No FAQs found in Trash.', 'hypercart-faqs' ),
-            'featured_image'        => __( 'Featured Image', 'hypercart-faqs' ),
-            'set_featured_image'    => __( 'Set featured image', 'hypercart-faqs' ),
-            'remove_featured_image' => __( 'Remove featured image', 'hypercart-faqs' ),
-            'use_featured_image'    => __( 'Use as featured image', 'hypercart-faqs' ),
-            'archives'              => __( 'FAQ archives', 'hypercart-faqs' ),
-            'insert_into_item'      => __( 'Insert into FAQ', 'hypercart-faqs' ),
-            'uploaded_to_this_item' => __( 'Uploaded to this FAQ', 'hypercart-faqs' ),
-            'items_list'            => __( 'FAQs list', 'hypercart-faqs' ),
-            'items_list_navigation' => __( 'FAQs list navigation', 'hypercart-faqs' ),
-            'filter_items_list'     => __( 'Filter FAQs list', 'hypercart-faqs' ),
+            'name'                  => __( 'FAQs', 'kiss-faqs' ),
+            'singular_name'         => __( 'FAQ', 'kiss-faqs' ),
+            'menu_name'             => __( 'FAQs', 'kiss-faqs' ),
+            'name_admin_bar'        => __( 'FAQ', 'kiss-faqs' ),
+            'add_new'               => __( 'Add New', 'kiss-faqs' ),
+            'add_new_item'          => __( 'Add New FAQ', 'kiss-faqs' ),
+            'new_item'              => __( 'New FAQ', 'kiss-faqs' ),
+            'edit_item'             => __( 'Edit FAQ', 'kiss-faqs' ),
+            'view_item'             => __( 'View FAQ', 'kiss-faqs' ),
+            'all_items'             => __( 'All FAQs', 'kiss-faqs' ),
+            'search_items'          => __( 'Search FAQs', 'kiss-faqs' ),
+            'parent_item_colon'     => __( 'Parent FAQs:', 'kiss-faqs' ),
+            'not_found'             => __( 'No FAQs found.', 'kiss-faqs' ),
+            'not_found_in_trash'    => __( 'No FAQs found in Trash.', 'kiss-faqs' ),
+            'featured_image'        => __( 'Featured Image', 'kiss-faqs' ),
+            'set_featured_image'    => __( 'Set featured image', 'kiss-faqs' ),
+            'remove_featured_image' => __( 'Remove featured image', 'kiss-faqs' ),
+            'use_featured_image'    => __( 'Use as featured image', 'kiss-faqs' ),
+            'archives'              => __( 'FAQ archives', 'kiss-faqs' ),
+            'insert_into_item'      => __( 'Insert into FAQ', 'kiss-faqs' ),
+            'uploaded_to_this_item' => __( 'Uploaded to this FAQ', 'kiss-faqs' ),
+            'items_list'            => __( 'FAQs list', 'kiss-faqs' ),
+            'items_list_navigation' => __( 'FAQs list navigation', 'kiss-faqs' ),
+            'filter_items_list'     => __( 'Filter FAQs list', 'kiss-faqs' ),
         );
 
         $args = array(
@@ -184,7 +186,7 @@ class HypercartFAQsWithSchema {
             'show_ui'            => true,
             'show_in_menu'       => true,
             'query_var'          => true,
-            'rewrite'            => array( 'slug' => 'hypercart-faq' ),
+            'rewrite'            => array( 'slug' => 'kiss-faq' ),
             'capability_type'    => 'post',
             'has_archive'        => true,
             'hierarchical'       => false,
@@ -193,27 +195,26 @@ class HypercartFAQsWithSchema {
             'supports'           => array( 'title', 'editor', 'revisions' ),
         );
 
-        register_post_type( 'hypercart_faq', $args );
+        register_post_type( 'kiss_faq', $args );
     }
 
     /**
      * Display the FAQ ID in the editor after saving
      */
     public function display_faq_id_in_editor( $post ) {
-        if ( 'hypercart_faq' === get_post_type( $post ) && $post->ID ) {
-            // Show only if it's not an auto-draft
+        if ( 'kiss_faq' === get_post_type( $post ) && $post->ID ) {
             if ( 'auto-draft' !== $post->post_status ) {
                 echo '<div style="margin: 10px 0; padding: 10px; background: #f1f1f1; border-left: 3px solid #ccc;">';
                 echo '<strong>FAQ ID:</strong> ' . absint( $post->ID ) . '<br>';
-                echo '<small>You can use this ID in a shortcode: <code>[HTPFAQ post="' . absint( $post->ID ) . '" hidden="true"]</code></small>';
+                echo '<small>You can use this ID in a shortcode: <code>[KISSFAQ post="' . absint( $post->ID ) . '" hidden="true"]</code></small>';
                 echo '</div>';
             }
         }
     }
 
     /**
-     * Shortcode: [HTPFAQ post="123" hidden="true"]
-     * Uses DOMContentLoaded approach for Safari-friendly reveal/hide
+     * Shortcode: [KISSFAQ post="123" hidden="true"]
+     * Safari-friendly toggle via DOMContentLoaded
      */
     public function render_faq_shortcode( $atts ) {
         // Default attributes
@@ -223,7 +224,7 @@ class HypercartFAQsWithSchema {
                 'hidden' => 'true', // default if not specified
             ),
             $atts,
-            'HTPFAQ'
+            'KISSFAQ'
         );
 
         $faq_id = absint( $atts['post'] );
@@ -233,54 +234,52 @@ class HypercartFAQsWithSchema {
 
         // Retrieve FAQ post
         $post = get_post( $faq_id );
-        if ( ! $post || 'hypercart_faq' !== $post->post_type ) {
+        if ( ! $post || 'kiss_faq' !== $post->post_type ) {
             return '<p style="color:red;">FAQ not found or invalid post type.</p>';
         }
 
-        // The question = post_title, answer = post_content
+        // Q = post_title, A = post_content
         $question = $post->post_title;
-        // Convert the post content to HTML via WP's the_content filters
         $answer   = apply_filters( 'the_content', $post->post_content );
 
         // Determine hidden setting
         $hidden = ( 'false' === strtolower( $atts['hidden'] ) ) ? false : true;
 
-        // Output the FAQ wrapper
+        // Output
         ob_start();
         ?>
-        <div class="hypercart-faq-wrapper" style="margin-bottom: 1em;">
-            <div class="hypercart-faq-question" style="cursor: pointer; font-weight: bold;">
-                <span class="hypercart-faq-caret" style="margin-right: 5px;">►</span>
+        <div class="kiss-faq-wrapper" style="margin-bottom: 1em;">
+            <div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
+                <span class="kiss-faq-caret" style="margin-right: 5px;">►</span>
                 <span><?php echo esc_html( $question ); ?></span>
             </div>
-            <div class="hypercart-faq-answer" style="<?php echo $hidden ? 'display:none;' : 'display:block;'; ?> margin-top: 5px;">
+            <div class="kiss-faq-answer" style="<?php echo $hidden ? 'display:none;' : 'display:block;'; ?> margin-top: 5px;">
                 <?php echo wp_kses_post( $answer ); ?>
             </div>
         </div>
         <?php
 
-        // Only add the reveal/hide JS once per page
-        static $hypercart_faqs_script_added = false;
-        if ( ! $hypercart_faqs_script_added ) :
-            $hypercart_faqs_script_added = true;
+        // Only add the JS once per page
+        static $kiss_faqs_script_added = false;
+        if ( ! $kiss_faqs_script_added ) :
+            $kiss_faqs_script_added = true;
         ?>
             <script>
             document.addEventListener('DOMContentLoaded', function(){
-                // Find all FAQ wrappers on the page
-                var faqWrappers = document.querySelectorAll('.hypercart-faq-wrapper');
+                var faqWrappers = document.querySelectorAll('.kiss-faq-wrapper');
                 faqWrappers.forEach(function(wrapper){
-                    var questionElement = wrapper.querySelector('.hypercart-faq-question');
-                    var answerElement   = wrapper.querySelector('.hypercart-faq-answer');
-                    var caretElement    = wrapper.querySelector('.hypercart-faq-caret');
-                    
-                    if (questionElement && answerElement && caretElement) {
-                        questionElement.addEventListener('click', function(){
-                            if (answerElement.style.display === 'none') {
-                                answerElement.style.display = 'block';
-                                caretElement.textContent = '▼';
+                    var questionElem = wrapper.querySelector('.kiss-faq-question');
+                    var answerElem   = wrapper.querySelector('.kiss-faq-answer');
+                    var caretElem    = wrapper.querySelector('.kiss-faq-caret');
+
+                    if (questionElem && answerElem && caretElem) {
+                        questionElem.addEventListener('click', function(){
+                            if (answerElem.style.display === 'none') {
+                                answerElem.style.display = 'block';
+                                caretElem.textContent = '▼';
                             } else {
-                                answerElement.style.display = 'none';
-                                caretElement.textContent = '►';
+                                answerElem.style.display = 'none';
+                                caretElem.textContent = '►';
                             }
                         });
                     }
@@ -290,7 +289,7 @@ class HypercartFAQsWithSchema {
         <?php
         endif;
 
-        // Generate JSON-LD for FAQ structured data
+        // JSON-LD for SEO
         $schema_data = array(
             '@context'   => 'https://schema.org',
             '@type'      => 'FAQPage',
@@ -315,27 +314,48 @@ class HypercartFAQsWithSchema {
     }
 
     /**
-     * Replace "Settings" link with a link to "All FAQs"
+     * Replace "Settings" link with a link to All FAQs
      */
     public function add_plugin_settings_link( $links ) {
         $all_faqs_link = sprintf(
             '<a href="%s">%s</a>',
-            esc_url( admin_url( 'edit.php?post_type=hypercart_faq' ) ),
-            __( 'All FAQs', 'hypercart-faqs' )
+            esc_url( admin_url( 'edit.php?post_type=kiss_faq' ) ),
+            __( 'All FAQs', 'kiss-faqs' )
         );
         array_unshift( $links, $all_faqs_link );
         return $links;
     }
 
     /**
-     * (Optional) If you want to keep a custom settings page
+     * Add a column to the CPT listing for Shortcode/Post ID
+     */
+    public function add_shortcode_column( $columns ) {
+        // We add a custom column at the end
+        $columns['kiss_faq_shortcode'] = __( 'Shortcode', 'kiss-faqs' );
+        return $columns;
+    }
+
+    /**
+     * Render the data in the new 'Shortcode' column
+     */
+    public function render_shortcode_column( $column, $post_id ) {
+        if ( 'kiss_faq_shortcode' === $column ) {
+            printf(
+                '<code>[KISSFAQ post="%d" hidden="true"]</code>',
+                absint( $post_id )
+            );
+        }
+    }
+
+    /**
+     * (Optional) Register plugin settings page under "Settings"
      */
     public function register_settings_menu() {
         add_options_page(
-            __( 'Hypercart FAQs Settings', 'hypercart-faqs' ),
-            __( 'Hypercart FAQs', 'hypercart-faqs' ),
+            __( 'KISS FAQs Settings', 'kiss-faqs' ),
+            __( 'KISS FAQs', 'kiss-faqs' ),
             'manage_options',
-            'hypercart_faqs_settings',
+            'kiss_faqs_settings',
             array( $this, 'render_settings_page' )
         );
     }
@@ -346,19 +366,20 @@ class HypercartFAQsWithSchema {
     public function render_settings_page() {
         ?>
         <div class="wrap">
-            <h1><?php esc_html_e( 'Hypercart FAQs Settings', 'hypercart-faqs' ); ?></h1>
-            <p><?php esc_html_e( 'Here you can configure settings for the Hypercart FAQs plugin.', 'hypercart-faqs' ); ?></p>
+            <h1><?php esc_html_e( 'KISS FAQs Settings', 'kiss-faqs' ); ?></h1>
+            <p><?php esc_html_e( 'Here you can configure settings for the KISS FAQs plugin.', 'kiss-faqs' ); ?></p>
             <form method="post" action="options.php">
                 <?php
-                // If you create custom settings, register them with register_setting().
-                // Then do settings_fields( 'your_setting_slug' ), do_settings_sections( 'your_page_slug' ), etc.
+                // If you create custom settings, register them, then use:
+                // settings_fields( 'your_setting_slug' );
+                // do_settings_sections( 'your_page_slug' );
                 ?>
                 <table class="form-table">
                     <tr>
-                        <th scope="row"><?php esc_html_e( 'Example Setting', 'hypercart-faqs' ); ?></th>
+                        <th scope="row"><?php esc_html_e( 'Example Setting', 'kiss-faqs' ); ?></th>
                         <td>
-                            <input type="text" name="hypercart_faq_example_setting" value="" />
-                            <p class="description"><?php esc_html_e( 'Just an example placeholder.', 'hypercart-faqs' ); ?></p>
+                            <input type="text" name="kiss_faq_example_setting" value="" />
+                            <p class="description"><?php esc_html_e( 'Just an example placeholder.', 'kiss-faqs' ); ?></p>
                         </td>
                     </tr>
                 </table>
@@ -370,4 +391,4 @@ class HypercartFAQsWithSchema {
 }
 
 // Initialize the plugin
-HypercartFAQsWithSchema::init();
+KISSFAQsWithSchema::init();
