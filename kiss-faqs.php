@@ -250,7 +250,7 @@ class KISSFAQsWithSchema {
         ?>
         <div class="kiss-faq-wrapper" style="margin-bottom: 1em;">
             <div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
-                <span class="kiss-faq-caret" style="margin-right: 5px;">►</span>
+                <span class="kiss-faq-caret" style="margin-right: 5px;"><?php echo $hidden ? '►' : '▼'; ?></span>
                 <span><?php echo esc_html( $question ); ?></span>
             </div>
             <div class="kiss-faq-answer" style="<?php echo $hidden ? 'display:none;' : 'display:block;'; ?> margin-top: 5px;">
