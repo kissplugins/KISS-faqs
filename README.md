@@ -114,12 +114,12 @@ There is no guarantee of its suitability, reliability, or security for any parti
 - **1.00**:  
   - Initial release with custom post type for FAQs and shortcodes for Q/A.
 
+---
+
+Enjoy the **Hypercart FAQs with Schema** plugin! If you have questions, feel free to reach out via [Your Website](https://example.com).
+
 **Follow Us on Blue Sky:**
 https://bsky.app/profile/kissplugins.bsky.social
 
 © Copyright Hypercart D.B.A. Neochrome, Inc.
 
-
----
-
-Enjoy the **Hypercart FAQs with Schema** plugin! If you have questions, feel free to reach out via [Your Website](https://example.com).
