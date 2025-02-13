@@ -61,6 +61,11 @@ class KISSFAQsWithSchema {
         // Shortcode
         add_shortcode( 'KISSFAQ', array( $this, 'render_faq_shortcode' ) );
 
+        // Shortcode
+        add_shortcode( 'KISSFAQS', array( $this, 'render_all_faqs_shortcode' ) );
+
+        add_action( 'init', array( $this, 'register_faq_category_taxonomy' ) );
+
         // Check for legacy data on admin notice
         add_action( 'admin_notices', array( $this, 'admin_notice_legacy_data' ) );
 
@@ -198,6 +203,14 @@ class KISSFAQsWithSchema {
         register_post_type( 'kiss_faq', $args );
     }
 
+    public function register_faq_category_taxonomy() {
+        register_taxonomy( 'faq_category', 'kiss_faq', array(
+            'label' => __( 'Categories', 'kiss-faqs' ),
+            'rewrite' => array( 'slug' => 'faq-category' ),
+            'hierarchical' => true,
+        ));
+    }
+
     /**
      * Display the FAQ ID in the editor after saving
      */
@@ -210,6 +223,106 @@ class KISSFAQsWithSchema {
                 echo '</div>';
             }
         }
+    }
+
+    public function render_all_faqs_shortcode( $atts ) {
+        $atts = shortcode_atts([
+            'hidden' => 'true',
+            'category' => '',
+            'exclude' => ''
+        ], $atts, 'KISSFAQS');
+
+        $args = array(
+            'post_type' => 'kiss_faq',
+            'posts_per_page' => -1,
+        );
+
+        if ( ! empty( $atts['category'] ) ) {
+            $args['tax_query'] = array([
+                'taxonomy' => 'faq_category',
+                'field' => 'slug',
+                'terms' => explode(',', $atts['category'])
+            ]);
+        }
+
+        if ( ! empty( $atts['exclude'] ) ) {
+            $args['post__not_in'] = array_map('intval', explode(',', $atts['exclude']));
+        }
+
+        $faqs = get_posts( $args );
+        if ( empty( $faqs ) ) return '<p>No FAQs found.</p>';
+
+        $output = '<div class="kiss-faqs">';
+        foreach ( $faqs as $faq ) {
+            // Q = post_title, A = post_content
+            $question = $faq->post_title;
+            $answer   = apply_filters( 'the_content', $faq->post_content );
+
+            // Determine hidden setting
+            $hidden = ( 'false' === strtolower( $atts['hidden'] ) ) ? false : true;
+            $output .= '<div class="kiss-faq-wrapper" style="margin-bottom: 1em;">';
+            $output .= '<div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
+                            <span class="kiss-faq-caret" style="margin-right: 5px;">' . ($hidden ? '►' : '▼') . '</span>
+                            <span>' . esc_html($question) . '</span>
+                        </div>';
+            $output .= '<div class="kiss-faq-answer" style="' . ($hidden ? 'display:none;' : 'display:block; margin-top: 5px;') . '">
+                            ' . wp_kses_post($answer) . '
+                        </div>';
+            $output .= '</div>';
+        }
+        $output .= '</div>';
+        // Only add the JS once per page
+        static $kiss_faqs_script_added = false;
+        if ( ! $kiss_faqs_script_added ) :
+            $kiss_faqs_script_added = true;
+        ?>
+            <script>
+            document.addEventListener('DOMContentLoaded', function(){
+                var faqWrappers = document.querySelectorAll('.kiss-faq-wrapper');
+                faqWrappers.forEach(function(wrapper){
+                    var questionElem = wrapper.querySelector('.kiss-faq-question');
+                    var answerElem   = wrapper.querySelector('.kiss-faq-answer');
+                    var caretElem    = wrapper.querySelector('.kiss-faq-caret');
+
+                    if (questionElem && answerElem && caretElem) {
+                        questionElem.addEventListener('click', function(){
+                            if (answerElem.style.display === 'none') {
+                                answerElem.style.display = 'block';
+                                caretElem.textContent = '▼';
+                            } else {
+                                answerElem.style.display = 'none';
+                                caretElem.textContent = '►';
+                            }
+                        });
+                    }
+                });
+            });
+            </script>
+        <?php
+        endif;
+
+        // JSON-LD for SEO
+        $schema_data = array(
+            '@context'   => 'https://schema.org',
+            '@type'      => 'FAQPage',
+            'mainEntity' => array(
+                array(
+                    '@type'          => 'Question',
+                    'name'           => $question,
+                    'acceptedAnswer' => array(
+                        '@type' => 'Answer',
+                        'text'  => wp_strip_all_tags( $answer ),
+                    ),
+                ),
+            ),
+        );
+        ?>
+        <script type="application/ld+json">
+        <?php echo wp_json_encode( $schema_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ); ?>
+        </script>
+        <?php
+
+        return $output;
     }
 
     /**
