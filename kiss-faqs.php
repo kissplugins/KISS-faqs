@@ -36,6 +36,7 @@ class KISSFAQsWithSchema {
     private static $instance = null;
     public $plugin_version = '1.04';
     public $db_table_name  = 'KISSFAQs'; // Table name (legacy)
+    private static $kiss_faq_schema_data = array();
 
     /**
      * Singleton Instance
@@ -76,6 +77,8 @@ class KISSFAQsWithSchema {
         // **NEW**: Add a column in the CPT listing to show the shortcode/post ID
         add_filter( 'manage_kiss_faq_posts_columns', array( $this, 'add_shortcode_column' ) );
         add_action( 'manage_kiss_faq_posts_custom_column', array( $this, 'render_shortcode_column' ), 10, 2 );
+
+        add_action('wp_footer', array($this, 'output_kiss_faq_schema'),999);
     }
 
     /**
@@ -290,24 +293,15 @@ class KISSFAQsWithSchema {
         endif;
 
         // JSON-LD for SEO
-        $schema_data = array(
-            '@context'   => 'https://schema.org',
-            '@type'      => 'FAQPage',
-            'mainEntity' => array(
-                array(
-                    '@type'          => 'Question',
-                    'name'           => $question,
-                    'acceptedAnswer' => array(
-                        '@type' => 'Answer',
-                        'text'  => wp_strip_all_tags( $answer ),
-                    ),
-                ),
+        self::$kiss_faq_schema_data[] = array(
+            '@type'          => 'Question',
+            'name'           => $question,
+            'acceptedAnswer' => array(
+                '@type' => 'Answer',
+                'text'  => wp_strip_all_tags($answer),
             ),
         );
         ?>
-        <script type="application/ld+json">
-        <?php echo wp_json_encode( $schema_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ); ?>
-        </script>
         <?php
 
         return ob_get_clean();
@@ -387,6 +381,19 @@ class KISSFAQsWithSchema {
             </form>
         </div>
         <?php
+    }
+
+    public function output_kiss_faq_schema() {
+        if (!empty(self::$kiss_faq_schema_data)) {
+            $schema_data = array(
+                '@context'   => 'https://schema.org',
+                '@type'      => 'FAQPage',
+                'mainEntity' => self::$kiss_faq_schema_data,
+            );
+            echo '<script type="application/ld+json">' . 
+                 wp_json_encode($schema_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . 
+                 '</script>';
+        }
     }
 }
 
