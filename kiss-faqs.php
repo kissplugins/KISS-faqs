@@ -253,13 +253,13 @@ class KISSFAQsWithSchema {
         if ( empty( $faqs ) ) return '<p>No FAQs found.</p>';
 
         $output = '<div class="kiss-faqs">';
-        foreach ( $faqs as $faq ) {
+        foreach ( $faqs as $index => $faq ) {
             // Q = post_title, A = post_content
             $question = $faq->post_title;
             $answer   = apply_filters( 'the_content', $faq->post_content );
 
             // Determine hidden setting
-            $hidden = ( 'false' === strtolower( $atts['hidden'] ) ) ? false : true;
+            $hidden = ( $index === 0 || 'false' === strtolower( $atts['hidden'] ) ) ? false : true;
             $output .= '<div class="kiss-faq-wrapper" style="margin-bottom: 1em;">';
             $output .= '<div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
                             <span class="kiss-faq-caret" style="margin-right: 5px;">' . ($hidden ? '►' : '▼') . '</span>
