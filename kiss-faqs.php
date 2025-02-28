@@ -536,7 +536,7 @@ class KISSFAQsWithSchema {
                                 <input type="checkbox" name="kiss_faqs_layout_style" value="sleuth-ai" <?php checked( get_option( 'kiss_faqs_layout_style', 'default' ), 'sleuth-ai' ); ?> />
                                 <?php esc_html_e( 'Use Sleuth AI Layout (checkbox enabled = Sleuth AI style, unchecked = default style)', 'kiss-faqs' ); ?>
                             </label>
-                            <p class="description"><?php esc_html_e( 'Enable this to match the Sleuth AI homepage FAQ layout.', 'kiss-faqs' ); ?></p>
+                            <p class="description"><?php esc_html_e( 'Enable this to match the alternate layout option for the FAQ section.', 'kiss-faqs' ); ?></p>
                         </td>
                     </tr>
                 </table>
