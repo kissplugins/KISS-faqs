@@ -36,6 +36,8 @@ When you **edit** or **create** a FAQ, the plugin shows you the **post ID** just
 - **FAQ ID** displayed in the edit screen.  
 - Automatically inserts **JSON-LD (FAQ Schema)** for each FAQ instance, helping Google identify your FAQ content for potential rich results.  
 - If an older version of the plugin had a custom DB table, the plugin checks for leftover records and alerts you in WP Admin.  
+- New Taxonomy (Category) Support. Display all posts within a category and exclude certain post IDs e.g. 
+[KISSFAQS category="test" exclude="827755,827756" hidden="true"]
 
 ---
 
