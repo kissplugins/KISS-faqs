@@ -255,6 +255,13 @@ class KISSFAQsWithSchema {
         $faqs = get_posts( $args );
         if ( empty( $faqs ) ) return '<p>No FAQs found.</p>';
 
+        // Initialize schema structure
+        $schema_data = array(
+            '@context'   => 'https://schema.org',
+            '@type'      => 'FAQPage',
+            'mainEntity' => [],
+        );
+
         $output = '<div class="kiss-faqs">';
         foreach ( $faqs as $index => $faq ) {
             // Q = post_title, A = post_content
@@ -272,6 +279,16 @@ class KISSFAQsWithSchema {
                             ' . wp_kses_post($answer) . '
                         </div>';
             $output .= '</div>';
+
+            // Add FAQ to schema
+            $schema_data['mainEntity'][] = array(
+                '@type'          => 'Question',
+                'name'           => $question,
+                'acceptedAnswer' => array(
+                    '@type' => 'Answer',
+                    'text'  => wp_strip_all_tags( $answer ),
+                ),
+            );
         }
         $output .= '</div>';
         // Only add the JS once per page
@@ -303,22 +320,6 @@ class KISSFAQsWithSchema {
             </script>
         <?php
         endif;
-
-        // JSON-LD for SEO
-        $schema_data = array(
-            '@context'   => 'https://schema.org',
-            '@type'      => 'FAQPage',
-            'mainEntity' => array(
-                array(
-                    '@type'          => 'Question',
-                    'name'           => $question,
-                    'acceptedAnswer' => array(
-                        '@type' => 'Answer',
-                        'text'  => wp_strip_all_tags( $answer ),
-                    ),
-                ),
-            ),
-        );
         ?>
         <script type="application/ld+json">
         <?php echo wp_json_encode( $schema_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ); ?>
