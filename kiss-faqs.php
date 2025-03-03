@@ -270,26 +270,29 @@ class KISSFAQsWithSchema {
 
             // Determine hidden setting
             $hidden = ( $index === 0 || 'false' === strtolower( $atts['hidden'] ) ) ? false : true;
-            $output .= '<div class="kiss-faq-wrapper" style="margin-bottom: 1em;">';
             if ( $layout === 'sleuth-ai' ) {
                 // Sleuth AI Layout
-                $output .= '<div class="kiss-faq-question sleuth-ai-layout" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #e0e0e0;">
+                $output .= '<div class="kiss-faq-wrapper" style="margin-bottom: 1em;border: 1px solid #e5e5e5;">';
+                $output .= '<div class="kiss-faq-question sleuth-ai-layout" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 10px; >
                                 <span style="font-size: 16px; font-weight: normal;">' . esc_html($question) . '</span>
-                                <span class="kiss-faq-toggle" style="font-size: 20px;">' . ($hidden ? '+' : '−') . '</span>
+                                <span class="kiss-faq-toggle" style="font-size: 30px;font-weight:400;">' . ($hidden ? '+' : '−') . '</span>
                             </div>';
-                $output .= '<div class="kiss-faq-answer" style="' . ($hidden ? 'display:none;' : 'display:block;') . ' padding: 10px 0; font-size: 14px; color: #333;">
+                $output .= '<div class="kiss-faq-answer" style="' . ($hidden ? 'display:none;' : 'display:block;') . ' padding: 10px; font-size: 14px;text-align:left;">
                                 ' . wp_kses_post($answer) . '
                             </div>';
+                $output .= '</div>';
             } else {
-            $output .= '<div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
-                            <span class="kiss-faq-caret" style="margin-right: 5px;">' . ($hidden ? '►' : '▼') . '</span>
-                            <span>' . esc_html($question) . '</span>
-                        </div>';
-            $output .= '<div class="kiss-faq-answer" style="' . ($hidden ? 'display:none;' : 'display:block; margin-top: 5px;') . '">
-                            ' . wp_kses_post($answer) . '
-                        </div>';
+                $output .= '<div class="kiss-faq-wrapper" style="margin-bottom: 1em;>';
+                $output .= '<div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
+                                <span class="kiss-faq-caret" style="margin-right: 5px;">' . ($hidden ? '►' : '▼') . '</span>
+                                <span>' . esc_html($question) . '</span>
+                            </div>';
+                $output .= '<div class="kiss-faq-answer" style="' . ($hidden ? 'display:none;' : 'display:block; margin-top: 5px;') . '">
+                                ' . wp_kses_post($answer) . '
+                            </div>';
+                $output .= '</div>';
             }
-            $output .= '</div>';
+            
         }
         $output .= '</div>';
         // Only add the JS once per page
@@ -386,27 +389,29 @@ class KISSFAQsWithSchema {
         // Output
         ob_start();
         ?>
-        <div class="kiss-faq-wrapper" style="margin-bottom: 1em;">
         <?php if ( $layout === 'sleuth-ai' ) : ?>
             <!-- Sleuth AI Layout -->
-            <div class="kiss-faq-question sleuth-ai-layout" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #e0e0e0;">
-                <span style="font-size: 16px; font-weight: normal;"><?php echo esc_html( $question ); ?></span>
-                <span class="kiss-faq-toggle" style="font-size: 20px;"><?php echo $hidden ? '+' : '−'; ?></span>
-            </div>
-            <div class="kiss-faq-answer" style="<?php echo $hidden ? 'display:none;' : 'display:block;'; ?> padding: 10px 0; font-size: 14px; color: #333;">
-                <?php echo wp_kses_post( $answer ); ?>
+            <div class="kiss-faq-wrapper" style="margin-bottom: 1em;border: 1px solid #e5e5e5;">
+                <div class="kiss-faq-question sleuth-ai-layout" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid #e5e5e5;">
+                    <span style="font-size: 16px; font-weight: normal;"><?php echo esc_html( $question ); ?></span>
+                    <span class="kiss-faq-toggle" style="font-size: 30px;font-weight:400;"><?php echo $hidden ? '+' : '−'; ?></span>
+                </div>
+                <div class="kiss-faq-answer" style="<?php echo $hidden ? 'display:none;' : 'display:block;'; ?> padding: 10px; font-size: 14px;text-align:left;">
+                    <?php echo wp_kses_post( $answer ); ?>
+                </div>
             </div>
         <?php else : ?>
             <!-- Default Layout -->
-            <div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
-                <span class="kiss-faq-caret" style="margin-right: 5px;"><?php echo $hidden ? '►' : '▼'; ?></span>
-                <span><?php echo esc_html( $question ); ?></span>
-            </div>
-            <div class="kiss-faq-answer" style="<?php echo $hidden ? 'display:none;' : 'display:block;'; ?> margin-top: 5px;">
-                <?php echo wp_kses_post( $answer ); ?>
+            <div class="kiss-faq-wrapper" style="margin-bottom: 1em;">
+                <div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
+                    <span class="kiss-faq-caret" style="margin-right: 5px;"><?php echo $hidden ? '►' : '▼'; ?></span>
+                    <span><?php echo esc_html( $question ); ?></span>
+                </div>
+                <div class="kiss-faq-answer" style="<?php echo $hidden ? 'display:none;' : 'display:block;'; ?> margin-top: 5px;">
+                    <?php echo wp_kses_post( $answer ); ?>
+                </div>
             </div>
         <?php endif; ?>
-        </div>
         <?php
 
         // Only add the JS once per page
