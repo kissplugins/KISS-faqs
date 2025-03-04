@@ -238,6 +238,8 @@ class KISSFAQsWithSchema {
         $args = array(
             'post_type' => 'kiss_faq',
             'posts_per_page' => -1,
+            'orderby'        => 'date',  // Order by date
+            'order'          => 'ASC',   // FIFO (Oldest first)
         );
 
         if ( ! empty( $atts['category'] ) ) {
