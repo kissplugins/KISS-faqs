@@ -67,6 +67,9 @@ class KISSFAQsWithSchema {
 
         add_action( 'init', array( $this, 'register_faq_category_taxonomy' ) );
 
+        // Register settings for the layout option
+        add_action( 'admin_init', array( $this, 'register_faq_layout_settings' ) );
+
         // Check for legacy data on admin notice
         add_action( 'admin_notices', array( $this, 'admin_notice_legacy_data' ) );
 
@@ -232,12 +235,15 @@ class KISSFAQsWithSchema {
         $atts = shortcode_atts([
             'hidden' => 'true',
             'category' => '',
-            'exclude' => ''
+            'exclude' => '',
+            'layout'   => get_option( 'kiss_faqs_layout_style', 'default' ),
         ], $atts, 'KISSFAQS');
 
         $args = array(
             'post_type' => 'kiss_faq',
             'posts_per_page' => -1,
+            'orderby'        => 'date',  // Order by date
+            'order'          => 'ASC',   // FIFO (Oldest first)
         );
 
         if ( ! empty( $atts['category'] ) ) {
@@ -255,6 +261,16 @@ class KISSFAQsWithSchema {
         $faqs = get_posts( $args );
         if ( empty( $faqs ) ) return '<p>No FAQs found.</p>';
 
+        // Determine layout
+        $layout = ( 'sleuth-ai' === $atts['layout'] ) ? 'sleuth-ai' : 'default';
+
+        // Initialize schema structure
+        $schema_data = array(
+            '@context'   => 'https://schema.org',
+            '@type'      => 'FAQPage',
+            'mainEntity' => [],
+        );
+
         $output = '<div class="kiss-faqs">';
         foreach ( $faqs as $index => $faq ) {
             // Q = post_title, A = post_content
@@ -263,15 +279,39 @@ class KISSFAQsWithSchema {
 
             // Determine hidden setting
             $hidden = ( $index === 0 || 'false' === strtolower( $atts['hidden'] ) ) ? false : true;
-            $output .= '<div class="kiss-faq-wrapper" style="margin-bottom: 1em;">';
-            $output .= '<div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
-                            <span class="kiss-faq-caret" style="margin-right: 5px;">' . ($hidden ? '►' : '▼') . '</span>
-                            <span>' . esc_html($question) . '</span>
-                        </div>';
-            $output .= '<div class="kiss-faq-answer" style="' . ($hidden ? 'display:none;' : 'display:block; margin-top: 5px;') . '">
-                            ' . wp_kses_post($answer) . '
-                        </div>';
-            $output .= '</div>';
+            if ( $layout === 'sleuth-ai' ) {
+                // Sleuth AI Layout
+                $output .= '<div class="kiss-faq-wrapper" style="margin-bottom: 1em;border: 1px solid #e5e5e5;">';
+                $output .= '<div class="kiss-faq-question sleuth-ai-layout" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 10px; >
+                                <span style="font-size: 16px; font-weight: normal;">' . esc_html($question) . '</span>
+                                <span class="kiss-faq-toggle" style="font-size: 30px;font-weight:400;">' . ($hidden ? '+' : '−') . '</span>
+                            </div>';
+                $output .= '<div class="kiss-faq-answer" style="' . ($hidden ? 'display:none;' : 'display:block;') . ' padding: 10px; font-size: 14px;text-align:left;">
+                                ' . wp_kses_post($answer) . '
+                            </div>';
+                $output .= '</div>';
+            } else {
+                $output .= '<div class="kiss-faq-wrapper" style="margin-bottom: 1em;>';
+                $output .= '<div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
+                                <span class="kiss-faq-caret" style="margin-right: 5px;">' . ($hidden ? '►' : '▼') . '</span>
+                                <span>' . esc_html($question) . '</span>
+                            </div>';
+                $output .= '<div class="kiss-faq-answer" style="' . ($hidden ? 'display:none;' : 'display:block; margin-top: 5px;') . '">
+                                ' . wp_kses_post($answer) . '
+                            </div>';
+                $output .= '</div>';
+            }
+
+            // Add FAQ to schema
+            $schema_data['mainEntity'][] = array(
+                '@type'          => 'Question',
+                'name'           => $question,
+                'acceptedAnswer' => array(
+                    '@type' => 'Answer',
+                    'text'  => wp_strip_all_tags( $answer ),
+                ),
+            );
+            
         }
         $output .= '</div>';
         // Only add the JS once per page
@@ -280,45 +320,29 @@ class KISSFAQsWithSchema {
             $kiss_faqs_script_added = true;
         ?>
             <script>
-            document.addEventListener('DOMContentLoaded', function(){
-                var faqWrappers = document.querySelectorAll('.kiss-faq-wrapper');
-                faqWrappers.forEach(function(wrapper){
-                    var questionElem = wrapper.querySelector('.kiss-faq-question');
-                    var answerElem   = wrapper.querySelector('.kiss-faq-answer');
-                    var caretElem    = wrapper.querySelector('.kiss-faq-caret');
+        document.addEventListener('DOMContentLoaded', function(){
+            var faqWrappers = document.querySelectorAll('.kiss-faq-wrapper');
+            faqWrappers.forEach(function(wrapper){
+                var questionElem = wrapper.querySelector('.kiss-faq-question');
+                var answerElem   = wrapper.querySelector('.kiss-faq-answer');
+                var toggleElem   = wrapper.querySelector('.kiss-faq-caret') || wrapper.querySelector('.kiss-faq-toggle');
 
-                    if (questionElem && answerElem && caretElem) {
-                        questionElem.addEventListener('click', function(){
-                            if (answerElem.style.display === 'none') {
-                                answerElem.style.display = 'block';
-                                caretElem.textContent = '▼';
-                            } else {
-                                answerElem.style.display = 'none';
-                                caretElem.textContent = '►';
-                            }
-                        });
-                    }
-                });
+                if (questionElem && answerElem && toggleElem) {
+                    questionElem.addEventListener('click', function(){
+                        if (answerElem.style.display === 'none') {
+                            answerElem.style.display = 'block';
+                            toggleElem.textContent = toggleElem.classList.contains('kiss-faq-caret') ? '▼' : '−';
+                        } else {
+                            answerElem.style.display = 'none';
+                            toggleElem.textContent = toggleElem.classList.contains('kiss-faq-caret') ? '►' : '+';
+                        }
+                    });
+                }
             });
-            </script>
+        });
+        </script>
         <?php
         endif;
-
-        // JSON-LD for SEO
-        $schema_data = array(
-            '@context'   => 'https://schema.org',
-            '@type'      => 'FAQPage',
-            'mainEntity' => array(
-                array(
-                    '@type'          => 'Question',
-                    'name'           => $question,
-                    'acceptedAnswer' => array(
-                        '@type' => 'Answer',
-                        'text'  => wp_strip_all_tags( $answer ),
-                    ),
-                ),
-            ),
-        );
         ?>
         <script type="application/ld+json">
         <?php echo wp_json_encode( $schema_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ); ?>
@@ -338,6 +362,8 @@ class KISSFAQsWithSchema {
             array(
                 'post'   => '',
                 'hidden' => 'true', // default if not specified
+                'layout' => get_option( 'kiss_faqs_layout_style', 'default' ),
+                
             ),
             $atts,
             'KISSFAQ'
@@ -361,18 +387,34 @@ class KISSFAQsWithSchema {
         // Determine hidden setting
         $hidden = ( 'false' === strtolower( $atts['hidden'] ) ) ? false : true;
 
+        $layout = ( 'sleuth-ai' === $atts['layout'] ) ? 'sleuth-ai' : 'default';
+
         // Output
         ob_start();
         ?>
-        <div class="kiss-faq-wrapper" style="margin-bottom: 1em;">
-            <div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
-                <span class="kiss-faq-caret" style="margin-right: 5px;"><?php echo $hidden ? '►' : '▼'; ?></span>
-                <span><?php echo esc_html( $question ); ?></span>
+        <?php if ( $layout === 'sleuth-ai' ) : ?>
+            <!-- Sleuth AI Layout -->
+            <div class="kiss-faq-wrapper" style="margin-bottom: 1em;border: 1px solid #e5e5e5;">
+                <div class="kiss-faq-question sleuth-ai-layout" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid #e5e5e5;">
+                    <span style="font-size: 16px; font-weight: normal;"><?php echo esc_html( $question ); ?></span>
+                    <span class="kiss-faq-toggle" style="font-size: 30px;font-weight:400;"><?php echo $hidden ? '+' : '−'; ?></span>
+                </div>
+                <div class="kiss-faq-answer" style="<?php echo $hidden ? 'display:none;' : 'display:block;'; ?> padding: 10px; font-size: 14px;text-align:left;">
+                    <?php echo wp_kses_post( $answer ); ?>
+                </div>
             </div>
-            <div class="kiss-faq-answer" style="<?php echo $hidden ? 'display:none;' : 'display:block;'; ?> margin-top: 5px;">
-                <?php echo wp_kses_post( $answer ); ?>
+        <?php else : ?>
+            <!-- Default Layout -->
+            <div class="kiss-faq-wrapper" style="margin-bottom: 1em;">
+                <div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
+                    <span class="kiss-faq-caret" style="margin-right: 5px;"><?php echo $hidden ? '►' : '▼'; ?></span>
+                    <span><?php echo esc_html( $question ); ?></span>
+                </div>
+                <div class="kiss-faq-answer" style="<?php echo $hidden ? 'display:none;' : 'display:block;'; ?> margin-top: 5px;">
+                    <?php echo wp_kses_post( $answer ); ?>
+                </div>
             </div>
-        </div>
+        <?php endif; ?>
         <?php
 
         // Only add the JS once per page
@@ -380,28 +422,28 @@ class KISSFAQsWithSchema {
         if ( ! $kiss_faqs_script_added ) :
             $kiss_faqs_script_added = true;
         ?>
-            <script>
-            document.addEventListener('DOMContentLoaded', function(){
-                var faqWrappers = document.querySelectorAll('.kiss-faq-wrapper');
-                faqWrappers.forEach(function(wrapper){
-                    var questionElem = wrapper.querySelector('.kiss-faq-question');
-                    var answerElem   = wrapper.querySelector('.kiss-faq-answer');
-                    var caretElem    = wrapper.querySelector('.kiss-faq-caret');
+        <script>
+        document.addEventListener('DOMContentLoaded', function(){
+            var faqWrappers = document.querySelectorAll('.kiss-faq-wrapper');
+            faqWrappers.forEach(function(wrapper){
+                var questionElem = wrapper.querySelector('.kiss-faq-question');
+                var answerElem   = wrapper.querySelector('.kiss-faq-answer');
+                var toggleElem   = wrapper.querySelector('.kiss-faq-caret') || wrapper.querySelector('.kiss-faq-toggle');
 
-                    if (questionElem && answerElem && caretElem) {
-                        questionElem.addEventListener('click', function(){
-                            if (answerElem.style.display === 'none') {
-                                answerElem.style.display = 'block';
-                                caretElem.textContent = '▼';
-                            } else {
-                                answerElem.style.display = 'none';
-                                caretElem.textContent = '►';
-                            }
-                        });
-                    }
-                });
+                if (questionElem && answerElem && toggleElem) {
+                    questionElem.addEventListener('click', function(){
+                        if (answerElem.style.display === 'none') {
+                            answerElem.style.display = 'block';
+                            toggleElem.textContent = toggleElem.classList.contains('kiss-faq-caret') ? '▼' : '−';
+                        } else {
+                            answerElem.style.display = 'none';
+                            toggleElem.textContent = toggleElem.classList.contains('kiss-faq-caret') ? '►' : '+';
+                        }
+                    });
+                }
             });
-            </script>
+        });
+        </script>
         <?php
         endif;
 
@@ -468,7 +510,21 @@ class KISSFAQsWithSchema {
     }
 
     /**
-     * (Optional) Render the plugin settings page
+     * Register settings for the plugin
+     */
+    public function register_faq_layout_settings() {
+        register_setting(
+            'kiss_faqs_settings_group', // Option group
+            'kiss_faqs_layout_style',   // Option name
+            array(
+                'sanitize_callback' => 'sanitize_text_field',
+                'default'           => 'default', // Default layout
+            )
+        );
+    }
+
+    /**
+     * Render the plugin settings page
      */
     public function render_settings_page() {
         ?>
@@ -477,16 +533,18 @@ class KISSFAQsWithSchema {
             <p><?php esc_html_e( 'Here you can configure settings for the KISS FAQs plugin.', 'kiss-faqs' ); ?></p>
             <form method="post" action="options.php">
                 <?php
-                // If you create custom settings, register them, then use:
-                // settings_fields( 'your_setting_slug' );
-                // do_settings_sections( 'your_page_slug' );
+                settings_fields( 'kiss_faqs_settings_group' ); // Option group
+                do_settings_sections( 'kiss_faqs_settings' );  // Page slug (optional sections)
                 ?>
                 <table class="form-table">
                     <tr>
-                        <th scope="row"><?php esc_html_e( 'Example Setting', 'kiss-faqs' ); ?></th>
+                        <th scope="row"><?php esc_html_e( 'FAQ Layout Style', 'kiss-faqs' ); ?></th>
                         <td>
-                            <input type="text" name="kiss_faq_example_setting" value="" />
-                            <p class="description"><?php esc_html_e( 'Just an example placeholder.', 'kiss-faqs' ); ?></p>
+                            <label>
+                                <input type="checkbox" name="kiss_faqs_layout_style" value="sleuth-ai" <?php checked( get_option( 'kiss_faqs_layout_style', 'default' ), 'sleuth-ai' ); ?> />
+                                <?php esc_html_e( 'Use Sleuth AI Layout (checkbox enabled = Sleuth AI style, unchecked = default style)', 'kiss-faqs' ); ?>
+                            </label>
+                            <p class="description"><?php esc_html_e( 'Enable this to match the alternate layout option for the FAQ section.', 'kiss-faqs' ); ?></p>
                         </td>
                     </tr>
                 </table>

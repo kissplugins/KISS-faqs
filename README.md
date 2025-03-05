@@ -25,7 +25,7 @@ A WordPress plugin to manage and display FAQs with **Google’s FAQ Schema** for
 - **Tested up to:** 6.x  
 - **Requires PHP:** 7.2+  
 
-This plugin registers a custom post type **hypercart_faq**, where the **post title** is the FAQ question, and the **post content** is the FAQ answer. Each FAQ can be displayed using the `[HTPFAQ post="ID" hidden="true"]` shortcode. Answers are hidden by default unless you set `hidden="false"`.  
+This plugin registers a custom post type **hypercart_faq**, where the **post title** is the FAQ question, and the **post content** is the FAQ answer. Each FAQ can be displayed using the `[KISSFAQ post="ID" hidden="true"]` shortcode. Answers are hidden by default unless you set `hidden="false"`.  
 
 When you **edit** or **create** a FAQ, the plugin shows you the **post ID** just below the title, making it easy to know which ID to place in the shortcode.
 
@@ -43,9 +43,9 @@ When you **edit** or **create** a FAQ, the plugin shows you the **post ID** just
 
 ## Schema for SEO
 
-Hypercart FAQs with Schema automatically includes [FAQPage schema](https://developers.google.com/search/docs/appearance/structured-data/faqpage) in **JSON-LD format** on any page or post that uses the `[HTPFAQ]` shortcode. This allows search engines (notably Google) to parse and display your FAQs in rich results, potentially giving you more visibility.
+Hypercart FAQs with Schema automatically includes [FAQPage schema](https://developers.google.com/search/docs/appearance/structured-data/faqpage) in **JSON-LD format** on any page or post that uses the `[KISSFAQ]` shortcode. This allows search engines (notably Google) to parse and display your FAQs in rich results, potentially giving you more visibility.
 
-- **Implementation**: When you embed `[HTPFAQ post="ID"]`, the plugin outputs JSON-LD markup describing the question and accepted answer.  
+- **Implementation**: When you embed `[KISSFAQ post="ID"]`, the plugin outputs JSON-LD markup describing the question and accepted answer.  
 - **FAQPage**: Each FAQ is treated as a `mainEntity` in the `FAQPage` schema.  
 - **Validation**: You can validate and test your FAQ markup with Google’s **Rich Results Test** or **Structured Data Testing Tool**.  
 
@@ -55,7 +55,7 @@ These structured data enhancements can improve your **SEO** by presenting users 
 
 ## Installation
 
-1. **Download or Copy** the `hypercart-faqs.php` file into a folder named `hypercart-faqs`, and place it in `wp-content/plugins/`.  
+1. **Download or Copy** the `kiss-faqs.php` file into a folder named `kiss-faqs`, and place it in `wp-content/plugins/`.  
 2. **Activate** via **Plugins → Installed Plugins** in your WordPress Admin.  
 3. Optionally, **check** the “FAQs” menu in your Admin to begin adding FAQs.
 
@@ -71,15 +71,21 @@ These structured data enhancements can improve your **SEO** by presenting users 
    - After saving, the plugin displays the **FAQ ID** below the title.
 
 2. **Insert FAQs**:  
-   - Use the shortcode `[HTPFAQ post="XYZ" hidden="true"]` in your post, page, or widget, where **XYZ** is the ID you noted.  
+   - Use the shortcode `[KISSFAQ post="XYZ" hidden="true"]` in your post, page, or widget, where **XYZ** is the ID you noted.  
    - `hidden="true"` collapses the answer initially, `hidden="false"` shows it expanded.
 
 3. **Check Structured Data**:  
    - Visit the post/page where you placed the shortcode.  
    - Use **Google Rich Results Test** to confirm your FAQ schema is detected.
 
-4. **All FAQs Link**:  
+4. **Insert All FAQs**
+   - Use the shortcode `[KISSFAQS category="cat_slug" exclude="123,143" hidden="true"]` in your post, page, or widget, where **cat_slug** is category slug and **123,143** are exclude posts IDs.
+   - `hidden="true"` collapses the answer initially, `hidden="false"` shows it expanded.
+
+5. **All FAQs Link**:  
    - On the **Plugins** page, the “All FAQs” link for this plugin goes directly to your FAQ listing screen in WP Admin.
+
+
 
 ---
 
