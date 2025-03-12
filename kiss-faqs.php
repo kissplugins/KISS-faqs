@@ -86,6 +86,9 @@ class KISSFAQsWithSchema {
         add_filter( 'manage_kiss_faq_posts_columns', array( $this, 'add_shortcode_column' ) );
         add_action( 'manage_kiss_faq_posts_custom_column', array( $this, 'render_shortcode_column' ), 10, 2 );
 
+        add_filter( 'manage_kiss_faq_posts_columns', array( $this, 'add_category_column' ) );
+        add_action( 'manage_kiss_faq_posts_custom_column', array( $this, 'render_category_column' ), 10, 2 );
+
         add_action('wp_footer', array($this, 'output_kiss_faq_schema'),999);
     }
 
@@ -203,7 +206,7 @@ class KISSFAQsWithSchema {
             'hierarchical'       => false,
             'menu_position'      => 25,
             'menu_icon'          => 'dashicons-editor-help',
-            'supports'           => array( 'title', 'editor', 'revisions' ),
+            'supports'           => array( 'title', 'editor', 'revisions', 'page-attributes' ),
         );
 
         register_post_type( 'kiss_faq', $args );
@@ -242,8 +245,10 @@ class KISSFAQsWithSchema {
         $args = array(
             'post_type' => 'kiss_faq',
             'posts_per_page' => -1,
-            'orderby'        => 'date',  // Order by date
-            'order'          => 'ASC',   // FIFO (Oldest first)
+            'orderby'        => array(
+                'menu_order' => 'ASC',
+                'date'       => 'ASC'
+            ),
         );
 
         if ( ! empty( $atts['category'] ) ) {
@@ -482,6 +487,30 @@ class KISSFAQsWithSchema {
         // We add a custom column at the end
         $columns['kiss_faq_shortcode'] = __( 'Shortcode', 'kiss-faqs' );
         return $columns;
+    }
+
+     /**
+     * Add a column to the CPT listing for Category
+     */
+    public function add_category_column( $columns ) {
+        // We add a custom column at the end
+        $columns['kiss_faq_category'] = __( 'Category', 'kiss-faqs' );
+        return $columns;
+    }
+
+    function render_category_column($column, $post_id) {
+        if ($column == 'kiss_faq_category') {
+            $terms = get_the_terms($post_id, 'faq_category');
+            if ($terms && !is_wp_error($terms)) {
+                $categories = array();
+                foreach ($terms as $term) {
+                    $categories[] = $term->name;
+                }
+                echo implode(', ', $categories);
+            } else {
+                echo '—'; // If no category is assigned
+            }
+        }
     }
 
     /**
