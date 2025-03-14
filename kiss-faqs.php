@@ -3,7 +3,7 @@
  * Plugin Name: KISS FAQs with Schema
  * Plugin URI:  https://KISSplugins.com
  * Description: Manage and display FAQs (Question = Post Title, Answer = Post Content Editor) with Google's Structured Data. Shortcode: [KISSFAQ post="ID"]. Safari-friendly toggle, displays FAQ ID in editor, and now has a column showing the shortcode/post ID.
- * Version: 1.04
+ * Version: 1.04.1
  * Author: KISS Plugins
  * Author URI: https://KISSplugins.com
  * License: GPL2
@@ -264,13 +264,6 @@ class KISSFAQsWithSchema {
         // Determine layout
         $layout = ( 'sleuth-ai' === $atts['layout'] ) ? 'sleuth-ai' : 'default';
 
-        // Initialize schema structure
-        $schema_data = array(
-            '@context'   => 'https://schema.org',
-            '@type'      => 'FAQPage',
-            'mainEntity' => [],
-        );
-
         $output = '<div class="kiss-faqs">';
         foreach ( $faqs as $index => $faq ) {
             // Q = post_title, A = post_content
@@ -303,12 +296,12 @@ class KISSFAQsWithSchema {
             }
 
             // Add FAQ to schema
-            $schema_data['mainEntity'][] = array(
+            self::$kiss_faq_schema_data[] = array(
                 '@type'          => 'Question',
                 'name'           => $question,
                 'acceptedAnswer' => array(
                     '@type' => 'Answer',
-                    'text'  => wp_strip_all_tags( $answer ),
+                    'text'  => wp_strip_all_tags($answer),
                 ),
             );
             
