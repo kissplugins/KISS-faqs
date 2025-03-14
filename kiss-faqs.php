@@ -3,7 +3,7 @@
  * Plugin Name: KISS FAQs with Schema
  * Plugin URI:  https://KISSplugins.com
  * Description: Manage and display FAQs (Question = Post Title, Answer = Post Content Editor) with Google's Structured Data. Shortcode: [KISSFAQ post="ID"]. Safari-friendly toggle, displays FAQ ID in editor, and now has a column showing the shortcode/post ID.
- * Version: 1.04
+ * Version: 1.05
  * Author: KISS Plugins
  * Author URI: https://KISSplugins.com
  * License: GPL2
@@ -31,10 +31,13 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit; // Disallow direct file access
 }
 
+// Define cache duration in seconds (1 hour default)
+define( 'KISS_FAQS_CACHE_DURATION', 3600 );
+
 class KISSFAQsWithSchema {
 
     private static $instance = null;
-    public $plugin_version = '1.04';
+    public $plugin_version = '1.05';
     public $db_table_name  = 'KISSFAQs'; // Table name (legacy)
     private static $kiss_faq_schema_data = array();
 
@@ -87,6 +90,9 @@ class KISSFAQsWithSchema {
         add_action( 'manage_kiss_faq_posts_custom_column', array( $this, 'render_shortcode_column' ), 10, 2 );
 
         add_action('wp_footer', array($this, 'output_kiss_faq_schema'),999);
+        
+        // Clear cache on post save/update
+        add_action('save_post_kiss_faq', array($this, 'clear_faq_cache'), 10, 3);
     }
 
     /**
@@ -117,7 +123,60 @@ class KISSFAQsWithSchema {
      * Plugin deactivation
      */
     public function deactivate_plugin() {
-        // e.g., do nothing or flush_rewrite_rules();
+        // Clear all plugin cache on deactivation
+        $this->clear_all_faq_cache();
+    }
+
+    /**
+     * Get cached data
+     *
+     * @param string $key Cache key
+     * @return mixed|false Cached data or false if cache miss
+     */
+    private function get_cache($key) {
+        return get_transient('kiss_faq_cache_' . md5($key));
+    }
+
+    /**
+     * Set cached data
+     *
+     * @param string $key Cache key
+     * @param mixed $data Data to cache
+     * @return bool True on success, false on failure
+     */
+    private function set_cache($key, $data) {
+        return set_transient('kiss_faq_cache_' . md5($key), $data, KISS_FAQS_CACHE_DURATION);
+    }
+
+    /**
+     * Clear single FAQ cache
+     * 
+     * @param int $post_id Post ID
+     * @param WP_Post $post Post object
+     * @param bool $update Whether this is an update
+     */
+    public function clear_faq_cache($post_id, $post, $update) {
+        // Delete specific post cache
+        delete_transient('kiss_faq_cache_' . md5('post_' . $post_id));
+        
+        // Also clear all FAQs caches as this post might be included
+        $this->clear_all_faqs_cache();
+    }
+    
+    /**
+     * Clear all FAQs cache (for categories, etc.)
+     */
+    private function clear_all_faqs_cache() {
+        global $wpdb;
+        $wpdb->query("DELETE FROM {$wpdb->prefix}options WHERE option_name LIKE '%kiss_faq_cache_all_faqs%'");
+    }
+    
+    /**
+     * Clear all plugin cache
+     */
+    private function clear_all_faq_cache() {
+        global $wpdb;
+        $wpdb->query("DELETE FROM {$wpdb->prefix}options WHERE option_name LIKE '%kiss_faq_cache_%'");
     }
 
     /**
@@ -239,6 +298,15 @@ class KISSFAQsWithSchema {
             'layout'   => get_option( 'kiss_faqs_layout_style', 'default' ),
         ], $atts, 'KISSFAQS');
 
+        // Create cache key based on shortcode attributes
+        $cache_key = 'all_faqs_' . md5(serialize($atts));
+        
+        // Check if we have cached output
+        $output = $this->get_cache($cache_key);
+        if ($output !== false) {
+            return $output;
+        }
+
         $args = array(
             'post_type' => 'kiss_faq',
             'posts_per_page' => -1,
@@ -318,6 +386,8 @@ class KISSFAQsWithSchema {
         static $kiss_faqs_script_added = false;
         if ( ! $kiss_faqs_script_added ) :
             $kiss_faqs_script_added = true;
+        
+            ob_start();
         ?>
             <script>
         document.addEventListener('DOMContentLoaded', function(){
@@ -342,12 +412,19 @@ class KISSFAQsWithSchema {
         });
         </script>
         <?php
+            $output .= ob_get_clean();
         endif;
+        
+        ob_start();
         ?>
         <script type="application/ld+json">
         <?php echo wp_json_encode( $schema_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ); ?>
         </script>
         <?php
+        $output .= ob_get_clean();
+
+        // Cache the output
+        $this->set_cache($cache_key, $output);
 
         return $output;
     }
@@ -372,6 +449,15 @@ class KISSFAQsWithSchema {
         $faq_id = absint( $atts['post'] );
         if ( ! $faq_id ) {
             return '<p style="color:red;">FAQ ID not specified or invalid.</p>';
+        }
+
+        // Create cache key for this specific FAQ
+        $cache_key = 'post_' . $faq_id . '_' . md5(serialize($atts));
+        
+        // Check if we have cached output
+        $output = $this->get_cache($cache_key);
+        if ($output !== false) {
+            return $output;
         }
 
         // Retrieve FAQ post
@@ -456,10 +542,13 @@ class KISSFAQsWithSchema {
                 'text'  => wp_strip_all_tags($answer),
             ),
         );
-        ?>
-        <?php
 
-        return ob_get_clean();
+        $output = ob_get_clean();
+        
+        // Cache the output
+        $this->set_cache($cache_key, $output);
+
+        return $output;
     }
 
     /**
@@ -547,11 +636,27 @@ class KISSFAQsWithSchema {
                             <p class="description"><?php esc_html_e( 'Enable this to match the alternate layout option for the FAQ section.', 'kiss-faqs' ); ?></p>
                         </td>
                     </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e( 'Cache Duration', 'kiss-faqs' ); ?></th>
+                        <td>
+                            <p><code>KISS_FAQS_CACHE_DURATION</code>: <?php echo KISS_FAQS_CACHE_DURATION; ?> seconds (<?php echo KISS_FAQS_CACHE_DURATION / 60; ?> minutes)</p>
+                            <p class="description"><?php esc_html_e( 'Cache duration is defined in the plugin file. Edit the KISS_FAQS_CACHE_DURATION constant to change it.', 'kiss-faqs' ); ?></p>
+                            <p>
+                                <button type="button" class="button" onclick="if(confirm('Clear all FAQ caches?')){window.location.href='<?php echo esc_url(add_query_arg('clear_kiss_faq_cache', '1', admin_url('options-general.php?page=kiss_faqs_settings'))); ?>';}">Clear FAQ Cache</button>
+                            </p>
+                        </td>
+                    </tr>
                 </table>
                 <?php submit_button(); ?>
             </form>
         </div>
         <?php
+        
+        // Check if we need to clear the cache
+        if (isset($_GET['clear_kiss_faq_cache']) && current_user_can('manage_options')) {
+            $this->clear_all_faq_cache();
+            echo '<div class="notice notice-success is-dismissible"><p>FAQ cache cleared successfully!</p></div>';
+        }
     }
 
     public function output_kiss_faq_schema() {
