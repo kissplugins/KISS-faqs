@@ -3,7 +3,7 @@
  * Plugin Name: KISS FAQs with Schema
  * Plugin URI:  https://KISSplugins.com
  * Description: Manage and display FAQs (Question = Post Title, Answer = Post Content Editor) with Google's Structured Data. Shortcode: [KISSFAQ post="ID"]. Safari-friendly toggle, displays FAQ ID in editor, and now has a column showing the shortcode/post ID.
- * Version: 1.04.1
+ * Version: 1.04.2
  * Author: KISS Plugins
  * Author URI: https://KISSplugins.com
  * License: GPL2
@@ -284,7 +284,7 @@ class KISSFAQsWithSchema {
                             </div>';
                 $output .= '</div>';
             } else {
-                $output .= '<div class="kiss-faq-wrapper" style="margin-bottom: 1em;>';
+                $output .= '<div class="kiss-faq-wrapper" style="margin-bottom: 1em;">';
                 $output .= '<div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
                                 <span class="kiss-faq-caret" style="margin-right: 5px;">' . ($hidden ? '►' : '▼') . '</span>
                                 <span>' . esc_html($question) . '</span>
