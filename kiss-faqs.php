@@ -336,11 +336,6 @@ class KISSFAQsWithSchema {
         </script>
         <?php
         endif;
-        ?>
-        <script type="application/ld+json">
-        <?php echo wp_json_encode( $schema_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ); ?>
-        </script>
-        <?php
 
         return $output;
     }
