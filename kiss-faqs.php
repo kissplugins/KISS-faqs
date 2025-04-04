@@ -235,6 +235,7 @@ class KISSFAQsWithSchema {
         $atts = shortcode_atts([
             'hidden' => 'true',
             'category' => '',
+            'sub-category' => '',
             'exclude' => '',
             'layout'   => get_option( 'kiss_faqs_layout_style', 'default' ),
         ], $atts, 'KISSFAQS');
@@ -246,12 +247,33 @@ class KISSFAQsWithSchema {
             'order'          => 'ASC',   // FIFO (Oldest first)
         );
 
-        if ( ! empty( $atts['category'] ) ) {
-            $args['tax_query'] = array([
-                'taxonomy' => 'faq_category',
-                'field' => 'slug',
-                'terms' => explode(',', $atts['category'])
-            ]);
+        if (!empty($atts['category']) || !empty($atts['sub-category'])) {
+            $faqs_tax_query = array();
+        
+            if (!empty($atts['category'])) {
+                $faqs_tax_query[] = array(
+                    'taxonomy' => 'faq_category',
+                    'field'    => 'slug',
+                    'terms'    => explode(',', $atts['category']),
+                    'include_children' => true,
+                );
+            }
+        
+            if (!empty($atts['sub-category'])) {
+                $faqs_tax_query[] = array(
+                    'taxonomy' => 'faq_category',
+                    'field'    => 'slug',
+                    'terms'    => explode(',', $atts['sub-category']),
+                    'include_children' => false,
+                );
+            }
+        
+            // If both category and sub-category are specified, use AND relation
+            if (count($faqs_tax_query) > 1) {
+                $faqs_tax_query['relation'] = 'AND';
+            }
+        
+            $args['tax_query'] = $faqs_tax_query;
         }
 
         if ( ! empty( $atts['exclude'] ) ) {
