@@ -31,6 +31,17 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit; // Disallow direct file access
 }
 
+// Include the Plugin Update Checker
+require plugin_dir_path(__FILE__) . 'lib/plugin-update-checker/plugin-update-checker.php';
+use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
+$myUpdateChecker = PucFactory::buildUpdateChecker(
+    'https://github.com/kissplugins/KISS-faqs',
+    __FILE__,
+    'kiss-faqs'
+);
+// Optional: Set the branch that contains the stable release.
+$myUpdateChecker->setBranch('main');
+
 class KISSFAQsWithSchema {
 
     private static $instance = null;
@@ -55,6 +66,8 @@ class KISSFAQsWithSchema {
         // Activation/Deactivation hooks
         register_activation_hook( __FILE__, array( $this, 'activate_plugin' ) );
         register_deactivation_hook( __FILE__, array( $this, 'deactivate_plugin' ) );
+
+        add_action('wp_head', array($this, 'add_faqs_inline_css'));
 
         // Register CPT
         add_action( 'init', array( $this, 'register_faqs_cpt' ) );
@@ -88,6 +101,23 @@ class KISSFAQsWithSchema {
 
         add_action('wp_footer', array($this, 'output_kiss_faq_schema'),999);
     }
+
+    public function add_faqs_inline_css() {
+        ?>
+        <style>
+            .kiss-faq-caret img{
+                width: 12px;
+            }
+            .kiss-faq-caret.collapsed img{
+                transform: translate(0, -2px) rotateZ(270deg);
+            }
+            .kiss-faq-caret.expanded img{
+                transform: unset;
+            }
+        </style>
+        <?php
+    }
+    
 
     /**
      * Plugin activation
@@ -235,6 +265,7 @@ class KISSFAQsWithSchema {
         $atts = shortcode_atts([
             'hidden' => 'true',
             'category' => '',
+            'sub-category' => '',
             'exclude' => '',
             'layout'   => get_option( 'kiss_faqs_layout_style', 'default' ),
         ], $atts, 'KISSFAQS');
@@ -246,12 +277,33 @@ class KISSFAQsWithSchema {
             'order'          => 'ASC',   // FIFO (Oldest first)
         );
 
-        if ( ! empty( $atts['category'] ) ) {
-            $args['tax_query'] = array([
-                'taxonomy' => 'faq_category',
-                'field' => 'slug',
-                'terms' => explode(',', $atts['category'])
-            ]);
+        if (!empty($atts['category']) || !empty($atts['sub-category'])) {
+            $faqs_tax_query = array();
+        
+            if (!empty($atts['category'])) {
+                $faqs_tax_query[] = array(
+                    'taxonomy' => 'faq_category',
+                    'field'    => 'slug',
+                    'terms'    => explode(',', $atts['category']),
+                    'include_children' => true,
+                );
+            }
+        
+            if (!empty($atts['sub-category'])) {
+                $faqs_tax_query[] = array(
+                    'taxonomy' => 'faq_category',
+                    'field'    => 'slug',
+                    'terms'    => explode(',', $atts['sub-category']),
+                    'include_children' => false,
+                );
+            }
+        
+            // If both category and sub-category are specified, use AND relation
+            if (count($faqs_tax_query) > 1) {
+                $faqs_tax_query['relation'] = 'AND';
+            }
+        
+            $args['tax_query'] = $faqs_tax_query;
         }
 
         if ( ! empty( $atts['exclude'] ) ) {
@@ -286,7 +338,7 @@ class KISSFAQsWithSchema {
             } else {
                 $output .= '<div class="kiss-faq-wrapper" style="margin-bottom: 1em;">';
                 $output .= '<div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
-                                <span class="kiss-faq-caret" style="margin-right: 5px;">' . ($hidden ? '►' : '▼') . '</span>
+                                <span class="kiss-faq-caret '.($hidden ? 'collapsed' : 'expanded').'" style="margin-right: 5px;">' .'<img src="' . plugins_url( 'assets/images/arrow.svg', __FILE__ ) . '" alt="toggle icon"></span>
                                 <span>' . esc_html($question) . '</span>
                             </div>';
                 $output .= '<div class="kiss-faq-answer" style="' . ($hidden ? 'display:none;' : 'display:block; margin-top: 5px;') . '">
@@ -315,6 +367,7 @@ class KISSFAQsWithSchema {
             <script>
         document.addEventListener('DOMContentLoaded', function(){
             var faqWrappers = document.querySelectorAll('.kiss-faq-wrapper');
+            var arrowImg = "<?php echo esc_url( plugins_url( 'assets/images/arrow.svg', __FILE__ ) ); ?>";
             faqWrappers.forEach(function(wrapper){
                 var questionElem = wrapper.querySelector('.kiss-faq-question');
                 var answerElem   = wrapper.querySelector('.kiss-faq-answer');
@@ -324,10 +377,14 @@ class KISSFAQsWithSchema {
                     questionElem.addEventListener('click', function(){
                         if (answerElem.style.display === 'none') {
                             answerElem.style.display = 'block';
-                            toggleElem.textContent = toggleElem.classList.contains('kiss-faq-caret') ? '▼' : '−';
+                            toggleElem.innerHTML = toggleElem.classList.contains('kiss-faq-caret') ? '<img src="' + arrowImg + '" alt="open">' : '−';
+                            toggleElem.classList.remove('collapsed');
+                            toggleElem.classList.add('expanded');
                         } else {
                             answerElem.style.display = 'none';
-                            toggleElem.textContent = toggleElem.classList.contains('kiss-faq-caret') ? '►' : '+';
+                            toggleElem.innerHTML = toggleElem.classList.contains('kiss-faq-caret') ? '<img src="' + arrowImg + '" alt="open">' : '+';
+                            toggleElem.classList.remove('expanded');
+                            toggleElem.classList.add('collapsed');
                         }
                     });
                 }
@@ -395,7 +452,7 @@ class KISSFAQsWithSchema {
             <!-- Default Layout -->
             <div class="kiss-faq-wrapper" style="margin-bottom: 1em;">
                 <div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
-                    <span class="kiss-faq-caret" style="margin-right: 5px;"><?php echo $hidden ? '►' : '▼'; ?></span>
+                    <span class="kiss-faq-caret <?php echo ($hidden ? 'collapsed' : 'expanded');?>" style="margin-right: 5px;"><?php echo '<img src="' . plugins_url( 'assets/images/arrow.svg', __FILE__ ) . '" alt="toggle icon">'; ?></span>
                     <span><?php echo esc_html( $question ); ?></span>
                 </div>
                 <div class="kiss-faq-answer" style="<?php echo $hidden ? 'display:none;' : 'display:block;'; ?> margin-top: 5px;">
@@ -413,6 +470,7 @@ class KISSFAQsWithSchema {
         <script>
         document.addEventListener('DOMContentLoaded', function(){
             var faqWrappers = document.querySelectorAll('.kiss-faq-wrapper');
+            var arrowImg = "<?php echo esc_url( plugins_url( 'assets/images/arrow.svg', __FILE__ ) ); ?>";
             faqWrappers.forEach(function(wrapper){
                 var questionElem = wrapper.querySelector('.kiss-faq-question');
                 var answerElem   = wrapper.querySelector('.kiss-faq-answer');
@@ -422,10 +480,14 @@ class KISSFAQsWithSchema {
                     questionElem.addEventListener('click', function(){
                         if (answerElem.style.display === 'none') {
                             answerElem.style.display = 'block';
-                            toggleElem.textContent = toggleElem.classList.contains('kiss-faq-caret') ? '▼' : '−';
+                            toggleElem.innerHTML = toggleElem.classList.contains('kiss-faq-caret') ? '<img src="' + arrowImg + '" alt="open">' : '−';
+                            toggleElem.classList.remove('collapsed');
+                            toggleElem.classList.add('expanded');
                         } else {
                             answerElem.style.display = 'none';
-                            toggleElem.textContent = toggleElem.classList.contains('kiss-faq-caret') ? '►' : '+';
+                            toggleElem.innerHTML = toggleElem.classList.contains('kiss-faq-caret') ? '<img src="' + arrowImg + '" alt="open">' : '+';
+                            toggleElem.classList.remove('expanded');
+                            toggleElem.classList.add('collapsed');
                         }
                     });
                 }
