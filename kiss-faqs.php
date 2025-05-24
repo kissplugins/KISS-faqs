@@ -3,7 +3,7 @@
  * Plugin Name: KISS FAQs with Schema
  * Plugin URI:  https://KISSplugins.com
  * Description: Manage and display FAQs (Question = Post Title, Answer = Post Content Editor) with Google's Structured Data. Shortcode: [KISSFAQ post="ID"]. Safari-friendly toggle, displays FAQ ID in editor, and now has a column showing the shortcode/post ID.
- * Version: 1.05
+ * Version: 1.06
  * Author: KISS Plugins
  * Author URI: https://KISSplugins.com
  * License: GPL2
@@ -58,7 +58,7 @@ class KISSFAQsWithSchema {
      * Plugin version.
      * @var string
      */
-    public $plugin_version = '1.05';
+    public $plugin_version = '1.06';
 
     /**
      * Legacy database table name.
@@ -335,14 +335,14 @@ class KISSFAQsWithSchema {
 
     /**
      * Renders all FAQs based on shortcode attributes.
-     * Shortcode: [KISSFAQS category="cat_slug" sub-category="sub_cat_slug" exclude="123,143" hidden="true" layout="default|sleuth-ai"]
+     * Shortcode: [KISSFAQS category="cat_slug" sub-category="sub_cat_slug" exclude="123,143" hidden="true|false" layout="default|sleuth-ai"]
      *
      * @param array $atts Shortcode attributes.
      * @return string HTML output for all FAQs.
      */
     public function render_all_faqs_shortcode( $atts ) {
         $atts = shortcode_atts([
-            'hidden' => 'true',
+            'hidden' => 'true', // Default is all hidden
             'category' => '',
             'sub-category' => '',
             'exclude' => '',
@@ -394,6 +394,7 @@ class KISSFAQsWithSchema {
 
         // Determine layout
         $layout = ( 'sleuth-ai' === $atts['layout'] ) ? 'sleuth-ai' : 'default';
+        $is_hidden_attribute_false = (strtolower($atts['hidden']) === 'false');
 
         $output = '<div class="kiss-faqs">';
         foreach ( $faqs as $index => $faq ) {
@@ -402,27 +403,36 @@ class KISSFAQsWithSchema {
             $answer   = apply_filters( 'the_content', $faq->post_content );
             $edit_link = $this->get_faq_edit_link( $faq->ID );
 
-            // Determine hidden setting
-            $hidden = ('false' !== strtolower( $atts['hidden'] ) );
+            // Determine initial hidden state for this specific item
+            $is_this_item_hidden_initially;
+            if ($is_hidden_attribute_false) {
+                // If hidden="false" is in the shortcode, only the first item ($index === 0) is shown (not hidden).
+                // All subsequent items are hidden initially.
+                $is_this_item_hidden_initially = ($index !== 0);
+            } else {
+                // If hidden="true" or hidden attribute is not 'false', all items are hidden initially.
+                $is_this_item_hidden_initially = true;
+            }
 
             if ( $layout === 'sleuth-ai' ) {
                 // Sleuth AI Layout
                 $output .= '<div class="kiss-faq-wrapper" style="margin-bottom: 1em;border: 1px solid #e5e5e5;">';
                 $output .= '<div class="kiss-faq-question sleuth-ai-layout" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 10px;">
                                 <span style="font-size: 16px; font-weight: normal;">' . esc_html($question) . $edit_link . '</span>
-                                <span class="kiss-faq-toggle" style="font-size: 30px;font-weight:400;">' . ($hidden ? '+' : '−') . '</span>
+                                <span class="kiss-faq-toggle" style="font-size: 30px;font-weight:400;">' . ($is_this_item_hidden_initially ? '+' : '−') . '</span>
                             </div>';
-                $output .= '<div class="kiss-faq-answer" style="' . ($hidden ? 'display:none;' : 'display:block;') . ' padding: 10px; font-size: 14px;text-align:left;">
+                $output .= '<div class="kiss-faq-answer" style="' . ($is_this_item_hidden_initially ? 'display:none;' : 'display:block;') . ' padding: 10px; font-size: 14px;text-align:left;">
                                 ' . wp_kses_post($answer) . '
                             </div>';
                 $output .= '</div>';
             } else {
+                // Default Layout
                 $output .= '<div class="kiss-faq-wrapper" style="margin-bottom: 1em;">';
                 $output .= '<div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
-                                <span class="kiss-faq-caret '.($hidden ? 'collapsed' : 'expanded').'" style="margin-right: 5px;">' .'<img src="' . plugins_url( 'assets/images/arrow.svg', __FILE__ ) . '" alt="toggle icon"></span>
+                                <span class="kiss-faq-caret '.($is_this_item_hidden_initially ? 'collapsed' : 'expanded').'" style="margin-right: 5px;">' .'<img src="' . plugins_url( 'assets/images/arrow.svg', __FILE__ ) . '" alt="toggle icon"></span>
                                 <span>' . esc_html($question) . $edit_link . '</span>
                             </div>';
-                $output .= '<div class="kiss-faq-answer" style="' . ($hidden ? 'display:none;' : 'display:block; margin-top: 5px;') . '">
+                $output .= '<div class="kiss-faq-answer" style="' . ($is_this_item_hidden_initially ? 'display:none;' : 'display:block; margin-top: 5px;') . '">
                                 ' . wp_kses_post($answer) . '
                             </div>';
                 $output .= '</div>';
@@ -485,7 +495,7 @@ class KISSFAQsWithSchema {
 
     /**
      * Renders a single FAQ based on post ID.
-     * Shortcode: [KISSFAQ post="123" hidden="true" layout="default|sleuth-ai"]
+     * Shortcode: [KISSFAQ post="123" hidden="true|false" layout="default|sleuth-ai"]
      *
      * @param array $atts Shortcode attributes.
      * @return string HTML output for a single FAQ.
@@ -520,8 +530,8 @@ class KISSFAQsWithSchema {
         $edit_link = $this->get_faq_edit_link( $faq_id );
 
 
-        // Determine hidden setting
-        $hidden = ( 'false' === strtolower( $atts['hidden'] ) ) ? false : true;
+        // Determine hidden setting for a single FAQ
+        $is_this_item_hidden_initially = ( 'false' === strtolower( $atts['hidden'] ) ) ? false : true;
 
         $layout = ( 'sleuth-ai' === $atts['layout'] ) ? 'sleuth-ai' : 'default';
 
@@ -532,19 +542,19 @@ class KISSFAQsWithSchema {
             <div class="kiss-faq-wrapper" style="margin-bottom: 1em;border: 1px solid #e5e5e5;">
                 <div class="kiss-faq-question sleuth-ai-layout" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 10px;">
                     <span style="font-size: 16px; font-weight: normal;"><?php echo esc_html( $question ); ?><?php echo $edit_link; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in get_faq_edit_link ?></span>
-                    <span class="kiss-faq-toggle" style="font-size: 30px;font-weight:400;"><?php echo $hidden ? '+' : '−'; ?></span>
+                    <span class="kiss-faq-toggle" style="font-size: 30px;font-weight:400;"><?php echo $is_this_item_hidden_initially ? '+' : '−'; ?></span>
                 </div>
-                <div class="kiss-faq-answer" style="<?php echo $hidden ? 'display:none;' : 'display:block;'; ?> padding: 10px; font-size: 14px;text-align:left;">
+                <div class="kiss-faq-answer" style="<?php echo $is_this_item_hidden_initially ? 'display:none;' : 'display:block;'; ?> padding: 10px; font-size: 14px;text-align:left;">
                     <?php echo wp_kses_post( $answer ); ?>
                 </div>
             </div>
         <?php else : ?>
             <div class="kiss-faq-wrapper" style="margin-bottom: 1em;">
                 <div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
-                    <span class="kiss-faq-caret <?php echo ($hidden ? 'collapsed' : 'expanded');?>" style="margin-right: 5px;"><?php echo '<img src="' . plugins_url( 'assets/images/arrow.svg', __FILE__ ) . '" alt="toggle icon">'; ?></span>
+                    <span class="kiss-faq-caret <?php echo ($is_this_item_hidden_initially ? 'collapsed' : 'expanded');?>" style="margin-right: 5px;"><?php echo '<img src="' . plugins_url( 'assets/images/arrow.svg', __FILE__ ) . '" alt="toggle icon">'; ?></span>
                     <span><?php echo esc_html( $question ); ?><?php echo $edit_link; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in get_faq_edit_link ?></span>
                 </div>
-                <div class="kiss-faq-answer" style="<?php echo $hidden ? 'display:none;' : 'display:block;'; ?> margin-top: 5px;">
+                <div class="kiss-faq-answer" style="<?php echo $is_this_item_hidden_initially ? 'display:none;' : 'display:block;'; ?> margin-top: 5px;">
                     <?php echo wp_kses_post( $answer ); ?>
                 </div>
             </div>
