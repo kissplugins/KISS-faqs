@@ -3,7 +3,7 @@
  * Plugin Name: KISS FAQs with Schema
  * Plugin URI:  https://KISSplugins.com
  * Description: Manage and display FAQs (Question = Post Title, Answer = Post Content Editor) with Google's Structured Data. Shortcode: [KISSFAQ post="ID"]. Safari-friendly toggle, displays FAQ ID in editor, and now has a column showing the shortcode/post ID.
- * Version: 1.04.2
+ * Version: 1.04.4
  * Author: KISS Plugins
  * Author URI: https://KISSplugins.com
  * License: GPL2
@@ -45,7 +45,7 @@ $myUpdateChecker->setBranch('main');
 class KISSFAQsWithSchema {
 
     private static $instance = null;
-    public $plugin_version = '1.04';
+    public $plugin_version = '1.04.4';
     public $db_table_name  = 'KISSFAQs'; // Table name (legacy)
     private static $kiss_faq_schema_data = array();
 
@@ -321,9 +321,17 @@ class KISSFAQsWithSchema {
             // Q = post_title, A = post_content
             $question = $faq->post_title;
             $answer   = apply_filters( 'the_content', $faq->post_content );
+            if ( is_array( $answer ) ) {
+                $answer = implode( '', $answer );
+            }
 
             // Determine hidden setting
-            $hidden = ( $index === 0 || 'false' === strtolower( $atts['hidden'] ) ) ? false : true;
+            if ( ! empty( $atts['category'] ) ) {
+                // When displaying a category, always show the first FAQ only
+                $hidden = $index === 0 ? false : true;
+            } else {
+                $hidden = ( $index === 0 || 'false' === strtolower( $atts['hidden'] ) ) ? false : true;
+            }
             if ( $layout === 'sleuth-ai' ) {
                 // Sleuth AI Layout
                 $output .= '<div class="kiss-faq-wrapper" style="margin-bottom: 1em;border: 1px solid #e5e5e5;">';
@@ -428,6 +436,9 @@ class KISSFAQsWithSchema {
         // Q = post_title, A = post_content
         $question = $post->post_title;
         $answer   = apply_filters( 'the_content', $post->post_content );
+        if ( is_array( $answer ) ) {
+            $answer = implode( '', $answer );
+        }
 
         // Determine hidden setting
         $hidden = ( 'false' === strtolower( $atts['hidden'] ) ) ? false : true;
