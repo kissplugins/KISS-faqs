@@ -3,7 +3,7 @@
  * Plugin Name: KISS FAQs with Schema
  * Plugin URI:  https://KISSplugins.com
  * Description: Manage and display FAQs (Question = Post Title, Answer = Post Content Editor) with Google's Structured Data. Shortcode: [KISSFAQ post="ID"]. Safari-friendly toggle, displays FAQ ID in editor, and now has a column showing the shortcode/post ID.
- * Version: 1.04.5
+ * Version: 1.04.6
  * Author: KISS Plugins
  * Author URI: https://KISSplugins.com
  * License: GPL2
@@ -32,20 +32,21 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Include the Plugin Update Checker
-require plugin_dir_path(__FILE__) . 'lib/plugin-update-checker/plugin-update-checker.php';
+require_once plugin_dir_path( __FILE__ ) . 'lib/plugin-update-checker/plugin-update-checker.php';
 use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
-$myUpdateChecker = PucFactory::buildUpdateChecker(
+
+$update_checker = PucFactory::buildUpdateChecker(
     'https://github.com/kissplugins/KISS-faqs',
     __FILE__,
     'kiss-faqs'
 );
 // Optional: Set the branch that contains the stable release.
-$myUpdateChecker->setBranch('main');
+$update_checker->setBranch( 'main' );
 
 class KISSFAQsWithSchema {
 
     private static $instance = null;
-    public $plugin_version = '1.04.5';
+    public $plugin_version = '1.04.6';
     public $db_table_name  = 'KISSFAQs'; // Table name (legacy)
     private static $kiss_faq_schema_data = array();
 
@@ -674,5 +675,6 @@ KISSFAQsWithSchema::init();
 
 /*
 Changelog:
+1.04.6 - Fixed syntax error in update checker and bumped version.
 1.04.5 - Added admin category column, front-end edit icon, and PHPDoc comments.
 */
