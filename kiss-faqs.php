@@ -3,7 +3,7 @@
  * Plugin Name: KISS FAQs with Schema
  * Plugin URI:  https://KISSplugins.com
  * Description: Manage and display FAQs (Question = Post Title, Answer = Post Content Editor) with Google's Structured Data. Shortcode: [KISSFAQ post="ID"]. Safari-friendly toggle, displays FAQ ID in editor, and now has a column showing the shortcode/post ID.
- * Version: 1.04.6
+ * Version: 1.04.7
  * Author: KISS Plugins
  * Author URI: https://KISSplugins.com
  * License: GPL2
@@ -46,7 +46,7 @@ $update_checker->setBranch( 'main' );
 class KISSFAQsWithSchema {
 
     private static $instance = null;
-    public $plugin_version = '1.04.6';
+    public $plugin_version = '1.04.7';
     public $db_table_name  = 'KISSFAQs'; // Table name (legacy)
     private static $kiss_faq_schema_data = array();
 
@@ -284,6 +284,12 @@ class KISSFAQsWithSchema {
         }
     }
 
+    /**
+     * Shortcode handler to display a list of FAQs.
+     *
+     * @param array $atts Shortcode attributes.
+     * @return string HTML output for the FAQ list.
+     */
     public function render_all_faqs_shortcode( $atts ) {
         $atts = shortcode_atts([
             'hidden' => 'true',
@@ -367,23 +373,19 @@ class KISSFAQsWithSchema {
             if ( $layout === 'sleuth-ai' ) {
                 // Sleuth AI Layout
                 $output .= '<div class="kiss-faq-wrapper" style="margin-bottom: 1em;border: 1px solid #e5e5e5;">';
-                $output .= '<div class="kiss-faq-question sleuth-ai-layout" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 10px; >
-                                <span style="font-size: 16px; font-weight: normal;">' . esc_html( $question ) . $edit_link . '</span>
-                                <span class="kiss-faq-toggle" style="font-size: 30px;font-weight:400;">' . ( $hidden ? '+' : '−' ) . '</span>
-                            </div>';
-                $output .= '<div class="kiss-faq-answer" style="' . ($hidden ? 'display:none;' : 'display:block;') . ' padding: 10px; font-size: 14px;text-align:left;">
-                                ' . wp_kses_post($answer) . '
-                            </div>';
+                $output .= '<div class="kiss-faq-question sleuth-ai-layout" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 10px;">';
+                $output .= '<span style="font-size: 16px; font-weight: normal;">' . esc_html( $question ) . $edit_link . '</span>';
+                $output .= '<span class="kiss-faq-toggle" style="font-size:30px;font-weight:400;">' . ( $hidden ? '+' : '−' ) . '</span>';
+                $output .= '</div>';
+                $output .= '<div class="kiss-faq-answer" style="' . ( $hidden ? 'display:none;' : 'display:block;' ) . ' padding: 10px; font-size: 14px;text-align:left;">' . wp_kses_post( $answer ) . '</div>';
                 $output .= '</div>';
             } else {
                 $output .= '<div class="kiss-faq-wrapper" style="margin-bottom: 1em;">';
-                $output .= '<div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
-                                <span class="kiss-faq-caret '.($hidden ? 'collapsed' : 'expanded').'" style="margin-right: 5px;">' .'<img src="' . plugins_url( 'assets/images/arrow.svg', __FILE__ ) . '" alt="toggle icon"></span>
-                                <span>' . esc_html($question) . '</span>' . $edit_link
-                            </div>';
-                $output .= '<div class="kiss-faq-answer" style="' . ($hidden ? 'display:none;' : 'display:block; margin-top: 5px;') . '">
-                                ' . wp_kses_post($answer) . '
-                            </div>';
+                $output .= '<div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">';
+                $output .= '<span class="kiss-faq-caret ' . ( $hidden ? 'collapsed' : 'expanded' ) . '" style="margin-right: 5px;">' . '<img src="' . plugins_url( 'assets/images/arrow.svg', __FILE__ ) . '" alt="toggle icon"></span>';
+                $output .= '<span>' . esc_html( $question ) . '</span>' . $edit_link;
+                $output .= '</div>';
+                $output .= '<div class="kiss-faq-answer" style="' . ( $hidden ? 'display:none;' : 'display:block; margin-top: 5px;' ) . '">' . wp_kses_post( $answer ) . '</div>';
                 $output .= '</div>';
             }
 
@@ -656,6 +658,11 @@ class KISSFAQsWithSchema {
         <?php
     }
 
+    /**
+     * Output JSON-LD schema for FAQs in the footer.
+     *
+     * This only runs if FAQs were rendered on the page.
+     */
     public function output_kiss_faq_schema() {
         if (!empty(self::$kiss_faq_schema_data)) {
             $schema_data = array(
@@ -675,6 +682,7 @@ KISSFAQsWithSchema::init();
 
 /*
 Changelog:
+1.04.7 - Fix layout rendering syntax and add docblocks.
 1.04.6 - Fixed syntax error in update checker and bumped version.
 1.04.5 - Added admin category column, front-end edit icon, and PHPDoc comments.
 */

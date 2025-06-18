@@ -107,6 +107,9 @@ There is no guarantee of its suitability, reliability, or security for any parti
 
 ## Version History
 
+- **1.04.7**:
+  - Fix layout rendering syntax and add docblocks.
+
 - **1.04.6**:
   - Fixed syntax error in update checker and bumped version.
 
