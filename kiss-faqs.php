@@ -112,6 +112,7 @@ class KISSFAQsWithSchema {
         <style>
             .kiss-faq-caret img{
                 width: 12px;
+                display: inline-block;
             }
             .kiss-faq-caret.collapsed img{
                 transform: translate(0, -2px) rotateZ(270deg);
