@@ -3,7 +3,7 @@
  * Plugin Name: KISS FAQs with Schema
  * Plugin URI:  https://KISSplugins.com
  * Description: Manage and display FAQs (Question = Post Title, Answer = Post Content Editor) with Google's Structured Data. Shortcode: [KISSFAQ post="ID"]. Safari-friendly toggle, displays FAQ ID in editor, and now has a column showing the shortcode/post ID.
- * Version: 1.04.7
+ * Version: 1.04.8
  * Author: KISS Plugins
  * Author URI: https://KISSplugins.com
  * License: GPL2
@@ -46,7 +46,7 @@ $update_checker->setBranch( 'main' );
 class KISSFAQsWithSchema {
 
     private static $instance = null;
-    public $plugin_version = '1.04.7';
+    public $plugin_version = '1.04.8';
     public $db_table_name  = 'KISSFAQs'; // Table name (legacy)
     private static $kiss_faq_schema_data = array();
 
@@ -381,7 +381,7 @@ class KISSFAQsWithSchema {
                 $output .= '</div>';
             } else {
                 $output .= '<div class="kiss-faq-wrapper" style="margin-bottom: 1em;">';
-                $output .= '<div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">';
+                $output .= '<div class="kiss-faq-question" style="cursor: pointer; font-weight: bold; display: flex; align-items: center; flex-wrap: nowrap;">';
                 $output .= '<span class="kiss-faq-caret ' . ( $hidden ? 'collapsed' : 'expanded' ) . '" style="margin-right: 5px;">' . '<img src="' . plugins_url( 'assets/images/arrow.svg', __FILE__ ) . '" alt="toggle icon"></span>';
                 $output .= '<span>' . esc_html( $question ) . '</span>' . $edit_link;
                 $output .= '</div>';
@@ -492,7 +492,6 @@ class KISSFAQsWithSchema {
         ob_start();
         ?>
         <?php if ( $layout === 'sleuth-ai' ) : ?>
-            <!-- Sleuth AI Layout -->
             <div class="kiss-faq-wrapper" style="margin-bottom: 1em;border: 1px solid #e5e5e5;">
                 <div class="kiss-faq-question sleuth-ai-layout" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid #e5e5e5;">
                     <span style="font-size: 16px; font-weight: normal;"><?php echo esc_html( $question ); ?><?php echo $edit_link; ?></span>
@@ -503,9 +502,8 @@ class KISSFAQsWithSchema {
                 </div>
             </div>
         <?php else : ?>
-            <!-- Default Layout -->
             <div class="kiss-faq-wrapper" style="margin-bottom: 1em;">
-                <div class="kiss-faq-question" style="cursor: pointer; font-weight: bold;">
+                <div class="kiss-faq-question" style="cursor: pointer; font-weight: bold; display: flex; align-items: center; flex-wrap: nowrap;">
                     <span class="kiss-faq-caret <?php echo ($hidden ? 'collapsed' : 'expanded');?>" style="margin-right: 5px;"><?php echo '<img src="' . plugins_url( 'assets/images/arrow.svg', __FILE__ ) . '" alt="toggle icon">'; ?></span>
                     <span><?php echo esc_html( $question ); ?><?php echo $edit_link; ?></span>
                 </div>
@@ -682,6 +680,7 @@ KISSFAQsWithSchema::init();
 
 /*
 Changelog:
+1.04.8 - Fixed caret and question appearing on separate lines in default layout by enforcing flex display and no-wrap.
 1.04.7 - Fix layout rendering syntax and add docblocks.
 1.04.6 - Fixed syntax error in update checker and bumped version.
 1.04.5 - Added admin category column, front-end edit icon, and PHPDoc comments.
