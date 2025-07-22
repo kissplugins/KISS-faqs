@@ -29,6 +29,12 @@ This plugin registers a custom post type **hypercart_faq**, where the **post tit
 
 When you **edit** or **create** a FAQ, the plugin shows you the **post ID** just below the title, making it easy to know which ID to place in the shortcode.
 
+### Description
+
+**Hypercart FAQs with Schema** is a lightweight WordPress plugin that lets you create and manage FAQs using a custom post type (`hypercart_faq`). The plugin integrates seamlessly with the WordPress editor — the post title becomes the FAQ question, and the post content becomes the answer.
+
+Display FAQs with the `[KISSFAQ]` shortcode, optionally using collapsible behavior. It also outputs valid JSON-LD FAQPage schema to enhance your SEO and improve visibility in search engine results.
+
 ### Key Features
 
 - Collapsible FAQs that **toggle** when clicked (Safari-friendly).  
@@ -55,9 +61,11 @@ These structured data enhancements can improve your **SEO** by presenting users 
 
 ## Installation
 
-1. **Download or Copy** the `kiss-faqs.php` file into a folder named `kiss-faqs`, and place it in `wp-content/plugins/`.  
-2. **Activate** via **Plugins → Installed Plugins** in your WordPress Admin.  
-3. Optionally, **check** the “FAQs” menu in your Admin to begin adding FAQs.
+1. Download the plugin `.zip` file from [git repository](https://github.com/kissplugins/KISS-faqs).
+2. Go to your WordPress admin → **Plugins > Add New**.
+3. Click **Upload Plugin**, select the zip file, and install it.
+4. Activate the plugin. That’s it! 
+5. Optionally, **check** the “FAQs” menu in your Admin to begin adding FAQs.
 
 > **Important**: Always **test** new or updated plugins on a **development/staging environment** before deploying to your production site.
 
@@ -137,6 +145,24 @@ Enjoy the **Hypercart FAQs with Schema** plugin! If you have questions, feel fre
 
 **Follow Us on Blue Sky:**
 https://bsky.app/profile/kissplugins.bsky.social
+
+## 📜 License
+
+Released under **GPL v2 or later**  
+[https://www.gnu.org/licenses/gpl-2.0.html](https://www.gnu.org/licenses/gpl-2.0.html)
+
+Use at your own risk. Provided as-is with no warranties.
+
+---
+
+## 📬 Contact & Support
+
+- Email: [devops@kissplugins.com](mailto:devops@kissplugins.com)
+- Email: [noel@kissplugins.com](mailto:noel@kissplugins.com)
+- Website: [https://kissplugins.com](https://kissplugins.com)
+- Follow us on Blue Sky: [kissplugins.bsky.social](https://bsky.app/profile/kissplugins.bsky.social)
+
+---
 
 © Copyright Hypercart D.B.A. Neochrome, Inc.
 
