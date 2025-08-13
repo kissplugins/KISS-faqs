@@ -3,7 +3,7 @@
  * Plugin Name: KISS FAQs with Schema
  * Plugin URI:  https://KISSplugins.com
  * Description: Manage and display FAQs (Question = Post Title, Answer = Post Content Editor) with Google's Structured Data. Shortcode: [KISSFAQ post="ID"]. Safari-friendly toggle, displays FAQ ID in editor, and now has a column showing the shortcode/post ID.
- * Version: 1.04.7
+ * Version: 1.05.0
  * Author: KISS Plugins
  * Author URI: https://KISSplugins.com
  * License: GPL2
@@ -46,7 +46,7 @@ $update_checker->setBranch( 'main' );
 class KISSFAQsWithSchema {
 
     private static $instance = null;
-    public $plugin_version = '1.04.7';
+    public $plugin_version = '1.05.0';
     public $db_table_name  = 'KISSFAQs'; // Table name (legacy)
     private static $kiss_faq_schema_data = array();
 
@@ -313,9 +313,15 @@ class KISSFAQsWithSchema {
             'layout'   => get_option( 'kiss_faqs_layout_style', 'default' ),
         ], $atts, 'KISSFAQS');
 
+        // Validate and sanitize attributes
+        $atts = $this->validate_shortcode_attributes( $atts, 'multiple' );
+        if ( is_wp_error( $atts ) ) {
+            return '<p style="color:red;">' . esc_html( $atts->get_error_message() ) . '</p>';
+        }
+
         $args = array(
             'post_type' => 'kiss_faq',
-            'posts_per_page' => -1,
+            'posts_per_page' => apply_filters( 'kiss_faq_query_limit', 100 ),
             'orderby'        => 'date',  // Order by date
             'order'          => 'ASC',   // FIFO (Oldest first)
         );
@@ -423,7 +429,7 @@ class KISSFAQsWithSchema {
             <script>
         document.addEventListener('DOMContentLoaded', function(){
             var faqWrappers = document.querySelectorAll('.kiss-faq-wrapper');
-            var arrowImg = "<?php echo esc_url( plugins_url( 'assets/images/arrow.svg', __FILE__ ) ); ?>";
+            var arrowImg = <?php echo wp_json_encode( plugins_url( 'assets/images/arrow.svg', __FILE__ ) ); ?>;
             faqWrappers.forEach(function(wrapper){
                 var questionElem = wrapper.querySelector('.kiss-faq-question');
                 var answerElem   = wrapper.querySelector('.kiss-faq-answer');
@@ -464,11 +470,17 @@ class KISSFAQsWithSchema {
                 'post'   => '',
                 'hidden' => 'true', // default if not specified
                 'layout' => get_option( 'kiss_faqs_layout_style', 'default' ),
-                
+
             ),
             $atts,
             'KISSFAQ'
         );
+
+        // Validate and sanitize attributes
+        $atts = $this->validate_shortcode_attributes( $atts, 'single' );
+        if ( is_wp_error( $atts ) ) {
+            return '<p style="color:red;">' . esc_html( $atts->get_error_message() ) . '</p>';
+        }
 
         $faq_id = absint( $atts['post'] );
         if ( ! $faq_id ) {
@@ -538,7 +550,7 @@ class KISSFAQsWithSchema {
         <script>
         document.addEventListener('DOMContentLoaded', function(){
             var faqWrappers = document.querySelectorAll('.kiss-faq-wrapper');
-            var arrowImg = "<?php echo esc_url( plugins_url( 'assets/images/arrow.svg', __FILE__ ) ); ?>";
+            var arrowImg = <?php echo wp_json_encode( plugins_url( 'assets/images/arrow.svg', __FILE__ ) ); ?>;
             faqWrappers.forEach(function(wrapper){
                 var questionElem = wrapper.querySelector('.kiss-faq-question');
                 var answerElem   = wrapper.querySelector('.kiss-faq-answer');
@@ -989,7 +1001,7 @@ class KISSFAQsWithSchema {
 
         $all_posts = get_posts( array(
             'post_type' => 'kiss_faq',
-            'posts_per_page' => -1,
+            'posts_per_page' => apply_filters( 'kiss_faq_cleanup_query_limit', 500 ), // Higher limit for cleanup
             'post_status' => array( 'publish', 'draft', 'private' )
         ) );
 
@@ -1011,6 +1023,11 @@ class KISSFAQsWithSchema {
      * Cleanup test FAQ posts
      */
     private function cleanup_test_faq_posts() {
+        // Security: Check user capabilities
+        if ( ! current_user_can( 'delete_posts' ) ) {
+            wp_die( __( 'You do not have sufficient permissions to perform this action.', 'kiss-faqs' ) );
+        }
+
         $test_posts = $this->get_test_faq_posts();
         $deleted_count = 0;
 
@@ -1357,6 +1374,104 @@ class KISSFAQsWithSchema {
 
         return ( 'no' === $include_in_sitemap );
     }
+
+    /**
+     * Validate and sanitize shortcode attributes
+     *
+     * @param array $atts Shortcode attributes
+     * @param string $type Type of shortcode ('single' or 'multiple')
+     * @return array|WP_Error Validated attributes or error
+     */
+    private function validate_shortcode_attributes( $atts, $type = 'single' ) {
+        $validated = array();
+
+        // Validate 'hidden' attribute
+        $validated['hidden'] = in_array( strtolower( $atts['hidden'] ), array( 'true', 'false' ), true )
+            ? strtolower( $atts['hidden'] )
+            : 'true';
+
+        // Validate 'layout' attribute
+        $allowed_layouts = array( 'default', 'sleuth-ai' );
+        $validated['layout'] = in_array( $atts['layout'], $allowed_layouts, true )
+            ? $atts['layout']
+            : 'default';
+
+        if ( 'single' === $type ) {
+            // Validate single FAQ post ID
+            $post_id = absint( $atts['post'] );
+            if ( $post_id <= 0 || $post_id > 999999999 ) { // Reasonable upper limit
+                return new WP_Error( 'invalid_post_id', 'Invalid FAQ post ID provided.' );
+            }
+            $validated['post'] = $post_id;
+
+        } elseif ( 'multiple' === $type ) {
+            // Validate category slugs
+            if ( ! empty( $atts['category'] ) ) {
+                $categories = explode( ',', $atts['category'] );
+                $validated_categories = array();
+
+                foreach ( $categories as $category ) {
+                    $category = trim( $category );
+                    // Allow only alphanumeric, hyphens, and underscores
+                    if ( preg_match( '/^[a-zA-Z0-9_-]+$/', $category ) && strlen( $category ) <= 50 ) {
+                        $validated_categories[] = sanitize_title( $category );
+                    }
+                }
+
+                if ( count( $validated_categories ) > 10 ) { // Limit number of categories
+                    return new WP_Error( 'too_many_categories', 'Too many categories specified (maximum 10).' );
+                }
+
+                $validated['category'] = implode( ',', $validated_categories );
+            } else {
+                $validated['category'] = '';
+            }
+
+            // Validate sub-category (same rules as category)
+            if ( ! empty( $atts['sub-category'] ) ) {
+                $sub_categories = explode( ',', $atts['sub-category'] );
+                $validated_sub_categories = array();
+
+                foreach ( $sub_categories as $sub_category ) {
+                    $sub_category = trim( $sub_category );
+                    if ( preg_match( '/^[a-zA-Z0-9_-]+$/', $sub_category ) && strlen( $sub_category ) <= 50 ) {
+                        $validated_sub_categories[] = sanitize_title( $sub_category );
+                    }
+                }
+
+                if ( count( $validated_sub_categories ) > 10 ) {
+                    return new WP_Error( 'too_many_subcategories', 'Too many sub-categories specified (maximum 10).' );
+                }
+
+                $validated['sub-category'] = implode( ',', $validated_sub_categories );
+            } else {
+                $validated['sub-category'] = '';
+            }
+
+            // Validate exclude IDs
+            if ( ! empty( $atts['exclude'] ) ) {
+                $exclude_ids = explode( ',', $atts['exclude'] );
+                $validated_ids = array();
+
+                foreach ( $exclude_ids as $id ) {
+                    $id = absint( trim( $id ) );
+                    if ( $id > 0 && $id <= 999999999 ) { // Reasonable limits
+                        $validated_ids[] = $id;
+                    }
+                }
+
+                if ( count( $validated_ids ) > 50 ) { // Limit as per roadmap
+                    return new WP_Error( 'too_many_excludes', 'Too many exclude IDs specified (maximum 50).' );
+                }
+
+                $validated['exclude'] = implode( ',', $validated_ids );
+            } else {
+                $validated['exclude'] = '';
+            }
+        }
+
+        return $validated;
+    }
 }
 
 // Initialize the plugin
@@ -1364,6 +1479,7 @@ KISSFAQsWithSchema::init();
 
 /*
 Changelog:
+1.05.0 - CRITICAL SECURITY RELEASE: Fixed XSS vulnerabilities in JavaScript context, added capability checks for cleanup operations, implemented query limits to prevent memory exhaustion, and comprehensive shortcode attribute validation.
 1.04.7 - Fix layout rendering syntax and add docblocks.
 1.04.6 - Fixed syntax error in update checker and bumped version.
 1.04.5 - Added admin category column, front-end edit icon, and PHPDoc comments.
