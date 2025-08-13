@@ -97,6 +97,9 @@ class KISSFAQsWithSchema {
         // (Optional) If you want a custom settings page
         add_action( 'admin_menu', array( $this, 'register_settings_menu' ) );
 
+        // **NEW**: Register README viewer page
+        add_action( 'admin_menu', array( $this, 'register_readme_viewer' ) );
+
         // **NEW**: Add a column in the CPT listing to show the shortcode/post ID
         add_filter( 'manage_kiss_faq_posts_columns', array( $this, 'add_shortcode_column' ) );
         add_action( 'manage_kiss_faq_posts_custom_column', array( $this, 'render_shortcode_column' ), 10, 2 );
@@ -578,15 +581,28 @@ class KISSFAQsWithSchema {
     }
 
     /**
-     * Replace "Settings" link with a link to All FAQs
+     * Add plugin action links (Settings, All FAQs, and Read Me)
      */
     public function add_plugin_settings_link( $links ) {
+        $settings_link = sprintf(
+            '<a href="%s">%s</a>',
+            esc_url( admin_url( 'edit.php?post_type=kiss_faq&page=kiss_faqs_settings' ) ),
+            __( 'Settings', 'kiss-faqs' )
+        );
+
         $all_faqs_link = sprintf(
             '<a href="%s">%s</a>',
             esc_url( admin_url( 'edit.php?post_type=kiss_faq' ) ),
             __( 'All FAQs', 'kiss-faqs' )
         );
-        array_unshift( $links, $all_faqs_link );
+
+        $readme_link = sprintf(
+            '<a href="%s">%s</a>',
+            esc_url( admin_url( 'edit.php?post_type=kiss_faq&page=kiss_faqs_readme' ) ),
+            __( 'Read Me', 'kiss-faqs' )
+        );
+
+        array_unshift( $links, $settings_link, $all_faqs_link, $readme_link );
         return $links;
     }
 
@@ -612,12 +628,13 @@ class KISSFAQsWithSchema {
     }
 
     /**
-     * (Optional) Register plugin settings page under "Settings"
+     * Register plugin settings page under FAQ CPT menu
      */
     public function register_settings_menu() {
-        add_options_page(
-            __( 'KISS FAQs Settings', 'kiss-faqs' ),
-            __( 'KISS FAQs', 'kiss-faqs' ),
+        add_submenu_page(
+            'edit.php?post_type=kiss_faq',
+            __( 'FAQ Settings', 'kiss-faqs' ),
+            __( 'Settings', 'kiss-faqs' ),
             'manage_options',
             'kiss_faqs_settings',
             array( $this, 'render_settings_page' )
@@ -653,7 +670,7 @@ class KISSFAQsWithSchema {
     public function render_settings_page() {
         ?>
         <div class="wrap">
-            <h1><?php esc_html_e( 'KISS FAQs Settings', 'kiss-faqs' ); ?></h1>
+            <h1><?php printf( esc_html__( 'KISS FAQs Settings (v%s)', 'kiss-faqs' ), $this->plugin_version ); ?></h1>
             <p><?php esc_html_e( 'Here you can configure settings for the KISS FAQs plugin.', 'kiss-faqs' ); ?></p>
             <form method="post" action="options.php">
                 <?php
@@ -686,8 +703,335 @@ class KISSFAQsWithSchema {
                 </table>
                 <?php submit_button(); ?>
             </form>
+
+            <!-- Self-Tests Section -->
+            <hr style="margin: 40px 0 20px 0;">
+            <h2><?php esc_html_e( 'Self-Tests & Diagnostics', 'kiss-faqs' ); ?></h2>
+            <p><?php esc_html_e( 'Run these tests to validate the sitemap functionality is working correctly:', 'kiss-faqs' ); ?></p>
+
+            <?php $this->render_self_tests(); ?>
+
+            <!-- Cleanup Section -->
+            <hr style="margin: 40px 0 20px 0;">
+            <h2><?php esc_html_e( 'Cleanup Tools', 'kiss-faqs' ); ?></h2>
+            <?php $this->render_cleanup_tools(); ?>
         </div>
         <?php
+    }
+
+    /**
+     * Render self-tests for sitemap functionality
+     */
+    public function render_self_tests() {
+        ?>
+        <div class="kiss-faqs-self-tests">
+            <style>
+                .kiss-test-result { padding: 10px; margin: 10px 0; border-radius: 4px; }
+                .kiss-test-pass { background: #d1e7dd; border: 1px solid #badbcc; color: #0f5132; }
+                .kiss-test-fail { background: #f8d7da; border: 1px solid #f5c2c7; color: #842029; }
+                .kiss-test-warning { background: #fff3cd; border: 1px solid #ffecb5; color: #664d03; }
+                .kiss-test-info { background: #d1ecf1; border: 1px solid #b8daff; color: #055160; }
+            </style>
+
+            <?php
+            // Test 1: Metabox Registration
+            $this->run_test_metabox_registration();
+
+            // Test 2: Global Setting Override
+            $this->run_test_global_setting_override();
+
+            // Test 3: Sitemap Exclusion
+            $this->run_test_sitemap_exclusion();
+
+            // Test 4: Noindex Tag Generation
+            $this->run_test_noindex_functionality();
+            ?>
+        </div>
+        <?php
+    }
+
+    /**
+     * Test 1: Metabox Registration
+     */
+    private function run_test_metabox_registration() {
+        echo '<h3>' . esc_html__( 'Test 1: Metabox Registration', 'kiss-faqs' ) . '</h3>';
+
+        // Test if add_meta_boxes hook is registered
+        $metabox_hook_registered = has_action( 'add_meta_boxes', array( $this, 'add_sitemap_control_metabox' ) );
+
+        if ( $metabox_hook_registered ) {
+            echo '<div class="kiss-test-result kiss-test-pass">';
+            echo '<strong>✓ PASS:</strong> Metabox registration hook is properly registered.';
+            echo '</div>';
+        } else {
+            echo '<div class="kiss-test-result kiss-test-fail">';
+            echo '<strong>✗ FAIL:</strong> Metabox registration hook is not registered.';
+            echo '</div>';
+        }
+
+        // Force trigger metabox registration for testing
+        do_action( 'add_meta_boxes', 'kiss_faq', null );
+
+        // Now check if metabox is actually registered
+        global $wp_meta_boxes;
+        $metabox_exists = isset( $wp_meta_boxes['kiss_faq']['side']['default']['kiss_faq_sitemap_control'] );
+
+        if ( $metabox_exists ) {
+            echo '<div class="kiss-test-result kiss-test-pass">';
+            echo '<strong>✓ PASS:</strong> Sitemap control metabox is properly registered for FAQ posts.';
+            echo '</div>';
+        } else {
+            echo '<div class="kiss-test-result kiss-test-warning">';
+            echo '<strong>⚠ WARNING:</strong> Metabox not found in global registry. This may be normal if not on a FAQ edit page.';
+            echo '</div>';
+        }
+
+        // Test if save_post hook is registered
+        $save_post_hooked = has_action( 'save_post', array( $this, 'save_sitemap_control_metabox' ) );
+        if ( $save_post_hooked ) {
+            echo '<div class="kiss-test-result kiss-test-pass">';
+            echo '<strong>✓ PASS:</strong> Save post hook is registered for metabox data.';
+            echo '</div>';
+        } else {
+            echo '<div class="kiss-test-result kiss-test-fail">';
+            echo '<strong>✗ FAIL:</strong> Save post hook is not registered.';
+            echo '</div>';
+        }
+    }
+
+    /**
+     * Test 2: Global Setting Override
+     */
+    private function run_test_global_setting_override() {
+        echo '<h3>' . esc_html__( 'Test 2: Global Setting Override', 'kiss-faqs' ) . '</h3>';
+
+        $global_setting = get_option( 'kiss_faqs_global_sitemap_inclusion', 'yes' );
+
+        echo '<div class="kiss-test-result kiss-test-info">';
+        echo '<strong>INFO:</strong> Current global setting: <code>' . esc_html( $global_setting ) . '</code>';
+        echo '</div>';
+
+        // Test the logic
+        if ( 'no' === $global_setting ) {
+            echo '<div class="kiss-test-result kiss-test-warning">';
+            echo '<strong>⚠ WARNING:</strong> Global sitemap inclusion is DISABLED. All FAQ posts will be excluded from sitemaps regardless of individual settings.';
+            echo '</div>';
+        } else {
+            echo '<div class="kiss-test-result kiss-test-pass">';
+            echo '<strong>✓ PASS:</strong> Global sitemap inclusion is ENABLED. Individual post settings will be respected.';
+            echo '</div>';
+        }
+
+        // Test settings registration
+        $registered_settings = get_registered_settings();
+        if ( isset( $registered_settings['kiss_faqs_global_sitemap_inclusion'] ) ) {
+            echo '<div class="kiss-test-result kiss-test-pass">';
+            echo '<strong>✓ PASS:</strong> Global sitemap setting is properly registered.';
+            echo '</div>';
+        } else {
+            echo '<div class="kiss-test-result kiss-test-fail">';
+            echo '<strong>✗ FAIL:</strong> Global sitemap setting is not registered.';
+            echo '</div>';
+        }
+    }
+
+    /**
+     * Test 3: Sitemap Exclusion
+     */
+    private function run_test_sitemap_exclusion() {
+        echo '<h3>' . esc_html__( 'Test 3: Sitemap Exclusion', 'kiss-faqs' ) . '</h3>';
+
+        // Check if sitemap filter is hooked
+        $filter_hooked = has_filter( 'wp_sitemaps_posts_query_args', array( $this, 'exclude_faqs_from_sitemap' ) );
+
+        if ( $filter_hooked ) {
+            echo '<div class="kiss-test-result kiss-test-pass">';
+            echo '<strong>✓ PASS:</strong> Sitemap exclusion filter is properly hooked.';
+            echo '</div>';
+        } else {
+            echo '<div class="kiss-test-result kiss-test-fail">';
+            echo '<strong>✗ FAIL:</strong> Sitemap exclusion filter is not hooked.';
+            echo '</div>';
+        }
+
+        // Test with sample data
+        $excluded_posts = $this->get_faqs_excluded_from_sitemap();
+        $total_faqs = wp_count_posts( 'kiss_faq' );
+        $published_faqs = isset( $total_faqs->publish ) ? $total_faqs->publish : 0;
+
+        echo '<div class="kiss-test-result kiss-test-info">';
+        echo '<strong>INFO:</strong> Total published FAQ posts: <code>' . esc_html( $published_faqs ) . '</code><br>';
+        echo '<strong>INFO:</strong> Posts excluded from sitemap: <code>' . count( $excluded_posts ) . '</code>';
+        if ( ! empty( $excluded_posts ) ) {
+            echo ' (IDs: ' . esc_html( implode( ', ', $excluded_posts ) ) . ')';
+        }
+        echo '</div>';
+
+        // Test sitemap URL accessibility
+        $sitemap_url = home_url( '/wp-sitemap-posts-kiss_faq-1.xml' );
+        echo '<div class="kiss-test-result kiss-test-info">';
+        echo '<strong>INFO:</strong> FAQ sitemap URL: <a href="' . esc_url( $sitemap_url ) . '" target="_blank">' . esc_html( $sitemap_url ) . '</a>';
+        echo '</div>';
+    }
+
+    /**
+     * Test 4: Noindex Tag Generation
+     */
+    private function run_test_noindex_functionality() {
+        echo '<h3>' . esc_html__( 'Test 4: Noindex Tag Generation', 'kiss-faqs' ) . '</h3>';
+
+        // Check if wp_head hook is registered
+        $head_hooked = has_action( 'wp_head', array( $this, 'add_noindex_for_excluded_faqs' ) );
+
+        if ( $head_hooked ) {
+            echo '<div class="kiss-test-result kiss-test-pass">';
+            echo '<strong>✓ PASS:</strong> Noindex functionality is hooked to wp_head.';
+            echo '</div>';
+        } else {
+            echo '<div class="kiss-test-result kiss-test-fail">';
+            echo '<strong>✗ FAIL:</strong> Noindex functionality is not hooked to wp_head.';
+            echo '</div>';
+        }
+
+        // Get a sample excluded post for testing
+        $excluded_posts = $this->get_faqs_excluded_from_sitemap();
+        $global_setting = get_option( 'kiss_faqs_global_sitemap_inclusion', 'yes' );
+
+        if ( 'no' === $global_setting ) {
+            echo '<div class="kiss-test-result kiss-test-warning">';
+            echo '<strong>⚠ INFO:</strong> Global setting is disabled - ALL FAQ posts will have noindex tags.';
+            echo '</div>';
+        } elseif ( ! empty( $excluded_posts ) ) {
+            $sample_post_id = $excluded_posts[0];
+            $sample_post_url = get_permalink( $sample_post_id );
+            echo '<div class="kiss-test-result kiss-test-info">';
+            echo '<strong>INFO:</strong> Sample excluded post for manual testing: ';
+            echo '<a href="' . esc_url( $sample_post_url ) . '" target="_blank">Post ID ' . esc_html( $sample_post_id ) . '</a>';
+            echo '<br><small>Visit this URL and check HTML source for: &lt;meta name="robots" content="noindex, nofollow" /&gt;</small>';
+            echo '</div>';
+        } else {
+            echo '<div class="kiss-test-result kiss-test-info">';
+            echo '<strong>INFO:</strong> No posts are currently excluded from sitemap. Create a test post and set it to "No" for sitemap inclusion to test noindex functionality.';
+            echo '</div>';
+        }
+    }
+
+    /**
+     * Render cleanup tools
+     */
+    public function render_cleanup_tools() {
+        // Handle cleanup action
+        if ( isset( $_POST['kiss_faq_cleanup_test_posts'] ) &&
+             wp_verify_nonce( $_POST['kiss_faq_cleanup_nonce'], 'kiss_faq_cleanup_action' ) ) {
+            $this->cleanup_test_faq_posts();
+        }
+
+        $test_posts = $this->get_test_faq_posts();
+        ?>
+        <div class="kiss-faq-cleanup-tools">
+            <?php if ( ! empty( $test_posts ) ) : ?>
+                <div class="kiss-test-result kiss-test-warning">
+                    <strong>⚠ WARNING:</strong> Found <?php echo count( $test_posts ); ?> potential test FAQ posts:
+                    <ul style="margin: 10px 0;">
+                        <?php foreach ( $test_posts as $post ) : ?>
+                            <li>
+                                <strong><?php echo esc_html( $post->post_title ); ?></strong>
+                                (ID: <?php echo $post->ID; ?>, Created: <?php echo esc_html( $post->post_date ); ?>)
+                                - <a href="<?php echo esc_url( get_edit_post_link( $post->ID ) ); ?>">Edit</a>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+
+                <form method="post" style="margin-top: 15px;">
+                    <?php wp_nonce_field( 'kiss_faq_cleanup_action', 'kiss_faq_cleanup_nonce' ); ?>
+                    <input type="submit" name="kiss_faq_cleanup_test_posts"
+                           class="button button-secondary"
+                           value="<?php esc_attr_e( 'Delete Test FAQ Posts', 'kiss-faqs' ); ?>"
+                           onclick="return confirm('<?php esc_attr_e( 'Are you sure you want to delete these test posts? This action cannot be undone.', 'kiss-faqs' ); ?>');" />
+                    <p class="description">
+                        <?php esc_html_e( 'This will permanently delete FAQ posts that appear to be test posts (containing "test", "sample", "demo", etc. in the title).', 'kiss-faqs' ); ?>
+                    </p>
+                </form>
+            <?php else : ?>
+                <div class="kiss-test-result kiss-test-pass">
+                    <strong>✓ CLEAN:</strong> No test FAQ posts detected.
+                </div>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    /**
+     * Get potential test FAQ posts
+     */
+    private function get_test_faq_posts() {
+        $test_keywords = array( 'test', 'sample', 'demo', 'example', 'dummy', 'lorem', 'ipsum' );
+
+        $args = array(
+            'post_type' => 'kiss_faq',
+            'posts_per_page' => -1,
+            'post_status' => array( 'publish', 'draft', 'private' ),
+            'meta_query' => array(
+                'relation' => 'OR',
+            )
+        );
+
+        // Add title search for test keywords
+        $title_search = array();
+        foreach ( $test_keywords as $keyword ) {
+            $title_search[] = array(
+                'key' => 'post_title',
+                'value' => $keyword,
+                'compare' => 'LIKE'
+            );
+        }
+
+        $all_posts = get_posts( array(
+            'post_type' => 'kiss_faq',
+            'posts_per_page' => -1,
+            'post_status' => array( 'publish', 'draft', 'private' )
+        ) );
+
+        $test_posts = array();
+        foreach ( $all_posts as $post ) {
+            $title_lower = strtolower( $post->post_title );
+            foreach ( $test_keywords as $keyword ) {
+                if ( strpos( $title_lower, $keyword ) !== false ) {
+                    $test_posts[] = $post;
+                    break;
+                }
+            }
+        }
+
+        return $test_posts;
+    }
+
+    /**
+     * Cleanup test FAQ posts
+     */
+    private function cleanup_test_faq_posts() {
+        $test_posts = $this->get_test_faq_posts();
+        $deleted_count = 0;
+
+        foreach ( $test_posts as $post ) {
+            if ( wp_delete_post( $post->ID, true ) ) { // true = force delete (skip trash)
+                $deleted_count++;
+            }
+        }
+
+        if ( $deleted_count > 0 ) {
+            echo '<div class="notice notice-success"><p>';
+            printf(
+                esc_html__( 'Successfully deleted %d test FAQ posts.', 'kiss-faqs' ),
+                $deleted_count
+            );
+            echo '</p></div>';
+        } else {
+            echo '<div class="notice notice-error"><p>';
+            esc_html_e( 'No test posts were deleted. Please check permissions.', 'kiss-faqs' );
+            echo '</p></div>';
+        }
     }
 
     /**
@@ -802,6 +1146,126 @@ class KISSFAQsWithSchema {
                 update_post_meta( $post_id, '_kiss_faq_include_in_sitemap', $include_in_sitemap );
             }
         }
+    }
+
+    /**
+     * Register README viewer page
+     */
+    public function register_readme_viewer() {
+        add_submenu_page(
+            'edit.php?post_type=kiss_faq',
+            __( 'Read Me', 'kiss-faqs' ),
+            __( 'Read Me', 'kiss-faqs' ),
+            'manage_options',
+            'kiss_faqs_readme',
+            array( $this, 'render_readme_viewer' )
+        );
+    }
+
+    /**
+     * Render the README viewer page
+     */
+    public function render_readme_viewer() {
+        $readme_path = plugin_dir_path( __FILE__ ) . 'README.md';
+        $readme_content = '';
+
+        if ( file_exists( $readme_path ) ) {
+            $readme_content = file_get_contents( $readme_path );
+        }
+
+        ?>
+        <div class="wrap">
+            <h1><?php printf( esc_html__( 'KISS FAQs - Read Me (v%s)', 'kiss-faqs' ), $this->plugin_version ); ?></h1>
+
+            <?php if ( empty( $readme_content ) ) : ?>
+                <div class="notice notice-error">
+                    <p><?php esc_html_e( 'README.md file not found.', 'kiss-faqs' ); ?></p>
+                </div>
+            <?php else : ?>
+                <div class="kiss-readme-content" style="max-width: 800px; line-height: 1.6;">
+                    <?php echo $this->markdown_to_html( $readme_content ); ?>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <style>
+            .kiss-readme-content h1 { font-size: 2em; margin: 1em 0 0.5em 0; border-bottom: 2px solid #ddd; padding-bottom: 0.3em; }
+            .kiss-readme-content h2 { font-size: 1.5em; margin: 1.5em 0 0.5em 0; border-bottom: 1px solid #eee; padding-bottom: 0.2em; }
+            .kiss-readme-content h3 { font-size: 1.3em; margin: 1.2em 0 0.4em 0; }
+            .kiss-readme-content h4 { font-size: 1.1em; margin: 1em 0 0.3em 0; }
+            .kiss-readme-content p { margin: 1em 0; }
+            .kiss-readme-content ul, .kiss-readme-content ol { margin: 1em 0; padding-left: 2em; }
+            .kiss-readme-content li { margin: 0.5em 0; }
+            .kiss-readme-content code { background: #f4f4f4; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+            .kiss-readme-content pre { background: #f4f4f4; padding: 1em; border-radius: 5px; overflow-x: auto; }
+            .kiss-readme-content pre code { background: none; padding: 0; }
+            .kiss-readme-content blockquote { border-left: 4px solid #ddd; margin: 1em 0; padding: 0.5em 1em; background: #f9f9f9; }
+            .kiss-readme-content strong { font-weight: bold; }
+            .kiss-readme-content em { font-style: italic; }
+            .kiss-readme-content a { color: #0073aa; text-decoration: none; }
+            .kiss-readme-content a:hover { text-decoration: underline; }
+            .kiss-readme-content hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
+        </style>
+        <?php
+    }
+
+    /**
+     * Simple markdown to HTML converter
+     */
+    private function markdown_to_html( $markdown ) {
+        // Escape HTML first
+        $html = esc_html( $markdown );
+
+        // Headers
+        $html = preg_replace( '/^#### (.+)$/m', '<h4>$1</h4>', $html );
+        $html = preg_replace( '/^### (.+)$/m', '<h3>$1</h3>', $html );
+        $html = preg_replace( '/^## (.+)$/m', '<h2>$1</h2>', $html );
+        $html = preg_replace( '/^# (.+)$/m', '<h1>$1</h1>', $html );
+
+        // Bold and italic
+        $html = preg_replace( '/\*\*(.+?)\*\*/', '<strong>$1</strong>', $html );
+        $html = preg_replace( '/\*(.+?)\*/', '<em>$1</em>', $html );
+
+        // Code blocks (triple backticks)
+        $html = preg_replace( '/```([^`]+)```/s', '<pre><code>$1</code></pre>', $html );
+
+        // Inline code
+        $html = preg_replace( '/`([^`]+)`/', '<code>$1</code>', $html );
+
+        // Links
+        $html = preg_replace( '/\[([^\]]+)\]\(([^)]+)\)/', '<a href="$2" target="_blank">$1</a>', $html );
+
+        // Horizontal rules
+        $html = preg_replace( '/^---$/m', '<hr>', $html );
+
+        // Lists (simple implementation)
+        $html = preg_replace( '/^- (.+)$/m', '<li>$1</li>', $html );
+        $html = preg_replace( '/^(\d+)\. (.+)$/m', '<li>$2</li>', $html );
+
+        // Wrap consecutive <li> elements in <ul>
+        $html = preg_replace( '/(<li>.*<\/li>)/s', '<ul>$1</ul>', $html );
+        $html = preg_replace( '/<\/ul>\s*<ul>/', '', $html ); // Merge consecutive lists
+
+        // Blockquotes
+        $html = preg_replace( '/^> (.+)$/m', '<blockquote>$1</blockquote>', $html );
+
+        // Paragraphs (convert double line breaks to paragraphs)
+        $html = preg_replace( '/\n\n/', '</p><p>', $html );
+        $html = '<p>' . $html . '</p>';
+
+        // Clean up empty paragraphs and fix formatting
+        $html = preg_replace( '/<p><\/p>/', '', $html );
+        $html = preg_replace( '/<p>(<h[1-6]>)/', '$1', $html );
+        $html = preg_replace( '/(<\/h[1-6]>)<\/p>/', '$1', $html );
+        $html = preg_replace( '/<p>(<hr>)<\/p>/', '$1', $html );
+        $html = preg_replace( '/<p>(<ul>)/', '$1', $html );
+        $html = preg_replace( '/(<\/ul>)<\/p>/', '$1', $html );
+        $html = preg_replace( '/<p>(<blockquote>)/', '$1', $html );
+        $html = preg_replace( '/(<\/blockquote>)<\/p>/', '$1', $html );
+        $html = preg_replace( '/<p>(<pre>)/', '$1', $html );
+        $html = preg_replace( '/(<\/pre>)<\/p>/', '$1', $html );
+
+        return $html;
     }
 
     /**
