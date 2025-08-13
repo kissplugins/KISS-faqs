@@ -101,6 +101,16 @@ class KISSFAQsWithSchema {
         add_filter( 'manage_kiss_faq_posts_columns', array( $this, 'add_shortcode_column' ) );
         add_action( 'manage_kiss_faq_posts_custom_column', array( $this, 'render_shortcode_column' ), 10, 2 );
 
+        // **NEW**: Sitemap control metabox
+        add_action( 'add_meta_boxes', array( $this, 'add_sitemap_control_metabox' ) );
+        add_action( 'save_post', array( $this, 'save_sitemap_control_metabox' ) );
+
+        // **NEW**: Sitemap exclusion functionality
+        add_filter( 'wp_sitemaps_posts_query_args', array( $this, 'exclude_faqs_from_sitemap' ), 10, 2 );
+
+        // **NEW**: Add noindex for excluded posts
+        add_action( 'wp_head', array( $this, 'add_noindex_for_excluded_faqs' ) );
+
         add_action('wp_footer', array($this, 'output_kiss_faq_schema'),999);
     }
 
@@ -626,6 +636,15 @@ class KISSFAQsWithSchema {
                 'default'           => 'default', // Default layout
             )
         );
+
+        register_setting(
+            'kiss_faqs_settings_group',        // Option group
+            'kiss_faqs_global_sitemap_inclusion', // Option name
+            array(
+                'sanitize_callback' => 'sanitize_text_field',
+                'default'           => 'yes', // Default to include in sitemap
+            )
+        );
     }
 
     /**
@@ -652,6 +671,18 @@ class KISSFAQsWithSchema {
                             <p class="description"><?php esc_html_e( 'Enable this to match the alternate layout option for the FAQ section.', 'kiss-faqs' ); ?></p>
                         </td>
                     </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e( 'Sitemap Settings', 'kiss-faqs' ); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="kiss_faqs_global_sitemap_inclusion" value="yes" <?php checked( get_option( 'kiss_faqs_global_sitemap_inclusion', 'yes' ), 'yes' ); ?> />
+                                <?php esc_html_e( 'Publish All FAQ Posts to Sitemap', 'kiss-faqs' ); ?>
+                            </label>
+                            <p class="description">
+                                <?php esc_html_e( 'When unchecked, ALL FAQ posts will be excluded from XML sitemaps regardless of individual post settings. This helps prevent SEO cannibalization.', 'kiss-faqs' ); ?>
+                            </p>
+                        </td>
+                    </tr>
                 </table>
                 <?php submit_button(); ?>
             </form>
@@ -671,10 +702,196 @@ class KISSFAQsWithSchema {
                 '@type'      => 'FAQPage',
                 'mainEntity' => self::$kiss_faq_schema_data,
             );
-            echo '<script type="application/ld+json">' . 
-                 wp_json_encode($schema_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . 
+            echo '<script type="application/ld+json">' .
+                 wp_json_encode($schema_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) .
                  '</script>';
         }
+    }
+
+    /**
+     * Add sitemap control metabox to FAQ post editor
+     */
+    public function add_sitemap_control_metabox() {
+        add_meta_box(
+            'kiss_faq_sitemap_control',
+            __( 'Sitemap Settings', 'kiss-faqs' ),
+            array( $this, 'render_sitemap_control_metabox' ),
+            'kiss_faq',
+            'side',
+            'default'
+        );
+    }
+
+    /**
+     * Render the sitemap control metabox
+     */
+    public function render_sitemap_control_metabox( $post ) {
+        // Add nonce for security
+        wp_nonce_field( 'kiss_faq_sitemap_control_nonce', 'kiss_faq_sitemap_control_nonce' );
+
+        // Get current value (default to 'yes' for new posts)
+        $include_in_sitemap = get_post_meta( $post->ID, '_kiss_faq_include_in_sitemap', true );
+        if ( empty( $include_in_sitemap ) ) {
+            $include_in_sitemap = 'yes';
+        }
+
+        // Check if global setting overrides individual setting
+        $global_sitemap_enabled = get_option( 'kiss_faqs_global_sitemap_inclusion', 'yes' );
+        $is_globally_disabled = ( 'no' === $global_sitemap_enabled );
+
+        ?>
+        <table class="form-table">
+            <tr>
+                <td>
+                    <label for="kiss_faq_include_in_sitemap">
+                        <?php esc_html_e( 'Publish to Sitemap:', 'kiss-faqs' ); ?>
+                    </label>
+                    <select name="kiss_faq_include_in_sitemap" id="kiss_faq_include_in_sitemap"
+                            <?php echo $is_globally_disabled ? 'disabled' : ''; ?>>
+                        <option value="yes" <?php selected( $include_in_sitemap, 'yes' ); ?>>
+                            <?php esc_html_e( 'Yes', 'kiss-faqs' ); ?>
+                        </option>
+                        <option value="no" <?php selected( $include_in_sitemap, 'no' ); ?>>
+                            <?php esc_html_e( 'No', 'kiss-faqs' ); ?>
+                        </option>
+                    </select>
+                    <?php if ( $is_globally_disabled ) : ?>
+                        <p class="description" style="color: #d63638;">
+                            <?php esc_html_e( 'Global sitemap inclusion is disabled. This setting is overridden.', 'kiss-faqs' ); ?>
+                        </p>
+                    <?php else : ?>
+                        <p class="description">
+                            <?php esc_html_e( 'Choose whether this FAQ should be included in XML sitemaps.', 'kiss-faqs' ); ?>
+                        </p>
+                    <?php endif; ?>
+                </td>
+            </tr>
+        </table>
+        <?php
+    }
+
+    /**
+     * Save the sitemap control metabox data
+     */
+    public function save_sitemap_control_metabox( $post_id ) {
+        // Check if nonce is valid
+        if ( ! isset( $_POST['kiss_faq_sitemap_control_nonce'] ) ||
+             ! wp_verify_nonce( $_POST['kiss_faq_sitemap_control_nonce'], 'kiss_faq_sitemap_control_nonce' ) ) {
+            return;
+        }
+
+        // Check if user has permission to edit the post
+        if ( ! current_user_can( 'edit_post', $post_id ) ) {
+            return;
+        }
+
+        // Check if this is an autosave
+        if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+            return;
+        }
+
+        // Check if this is the correct post type
+        if ( get_post_type( $post_id ) !== 'kiss_faq' ) {
+            return;
+        }
+
+        // Save the sitemap inclusion setting
+        if ( isset( $_POST['kiss_faq_include_in_sitemap'] ) ) {
+            $include_in_sitemap = sanitize_text_field( $_POST['kiss_faq_include_in_sitemap'] );
+            if ( in_array( $include_in_sitemap, array( 'yes', 'no' ), true ) ) {
+                update_post_meta( $post_id, '_kiss_faq_include_in_sitemap', $include_in_sitemap );
+            }
+        }
+    }
+
+    /**
+     * Exclude FAQ posts from sitemap based on settings
+     */
+    public function exclude_faqs_from_sitemap( $args, $post_type ) {
+        // Only apply to kiss_faq post type
+        if ( 'kiss_faq' !== $post_type ) {
+            return $args;
+        }
+
+        // Check global setting first
+        $global_sitemap_enabled = get_option( 'kiss_faqs_global_sitemap_inclusion', 'yes' );
+        if ( 'no' === $global_sitemap_enabled ) {
+            // Global setting disabled - exclude all FAQ posts
+            $args['post__in'] = array( 0 ); // This will return no posts
+            return $args;
+        }
+
+        // Global setting is enabled, check individual post settings
+        $excluded_posts = $this->get_faqs_excluded_from_sitemap();
+        if ( ! empty( $excluded_posts ) ) {
+            $args['post__not_in'] = $excluded_posts;
+        }
+
+        return $args;
+    }
+
+    /**
+     * Get FAQ posts that should be excluded from sitemap
+     */
+    private function get_faqs_excluded_from_sitemap() {
+        global $wpdb;
+
+        $excluded_posts = $wpdb->get_col( $wpdb->prepare(
+            "SELECT post_id FROM {$wpdb->postmeta} pm
+             INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+             WHERE pm.meta_key = %s
+             AND pm.meta_value = %s
+             AND p.post_type = %s
+             AND p.post_status = 'publish'",
+            '_kiss_faq_include_in_sitemap',
+            'no',
+            'kiss_faq'
+        ) );
+
+        return array_map( 'intval', $excluded_posts );
+    }
+
+    /**
+     * Add noindex meta tag for FAQ posts excluded from sitemap
+     */
+    public function add_noindex_for_excluded_faqs() {
+        // Only run on single FAQ posts
+        if ( ! is_singular( 'kiss_faq' ) ) {
+            return;
+        }
+
+        $post_id = get_the_ID();
+        if ( ! $post_id ) {
+            return;
+        }
+
+        // Check if this post should be excluded from sitemap
+        $should_exclude = $this->should_exclude_faq_from_sitemap( $post_id );
+
+        if ( $should_exclude ) {
+            echo '<meta name="robots" content="noindex, nofollow" />' . "\n";
+        }
+    }
+
+    /**
+     * Check if a specific FAQ post should be excluded from sitemap
+     */
+    private function should_exclude_faq_from_sitemap( $post_id ) {
+        // Check global setting first
+        $global_sitemap_enabled = get_option( 'kiss_faqs_global_sitemap_inclusion', 'yes' );
+        if ( 'no' === $global_sitemap_enabled ) {
+            return true; // Global setting overrides individual setting
+        }
+
+        // Check individual post setting
+        $include_in_sitemap = get_post_meta( $post_id, '_kiss_faq_include_in_sitemap', true );
+
+        // Default to 'yes' if not set
+        if ( empty( $include_in_sitemap ) ) {
+            $include_in_sitemap = 'yes';
+        }
+
+        return ( 'no' === $include_in_sitemap );
     }
 }
 
