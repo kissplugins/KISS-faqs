@@ -1172,7 +1172,7 @@ class KISSFAQsWithSchema {
         add_submenu_page(
             'edit.php?post_type=kiss_faq',
             __( 'Read Me', 'kiss-faqs' ),
-            __( 'Read Me', 'kiss-faqs' ),
+            __( 'Read Me (FAQs)', 'kiss-faqs' ),
             'manage_options',
             'kiss_faqs_readme',
             array( $this, 'render_readme_viewer' )
