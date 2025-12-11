@@ -15,7 +15,6 @@
 ### Q: What are the plugin's basic specifications?
 **A:** 
 - **Plugin Name:** KISS FAQs with Schema  
-- **Version:** 1.04.7  
 - **Author:** KISS Plugins
 - **Website:** KISSPlugins.com
 - **License:** GPL v2  
